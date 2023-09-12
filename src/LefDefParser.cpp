@@ -214,7 +214,8 @@ LefDefParser::LefDefParser()
     numPO_      (0),
     numInst_    (0),
     numNet_     (0),
-    numPin_     (0)
+    numPin_     (0),
+    numRow_     (0)
 {
   strToMacroClass_["CORE"       ] = MacroClass::CORE;
   strToMacroClass_["CORE_SPACER"] = MacroClass::CORE_SPACER;
@@ -366,7 +367,7 @@ LefDefParser::readLefMacro(strIter& itr, const strIter& end)
 
   if(itr == end)
   {
-    std::cout << "Syntax Error in LEF." << std::endl;
+    std::cout << "Syntax Error in LEF."     << std::endl;
     std::cout << "No END keyword in MACRO " << macroName << std::endl;
     exit(0);
   }
@@ -495,14 +496,11 @@ LefDefParser::readVerilog(const std::filesystem::path& path)
 
   static std::string_view delimiters = "(),:;/#[]{}*\"\\";
   static std::string_view exceptions = "().;";
-  //static std::string_view exceptions = "";
   
   auto tokens = tokenize(path, delimiters, exceptions);
 
   auto itr = tokens.begin();
   auto end = tokens.end();
-
-  std::string moduleName;
 
   // Read the module name
   itr = std::find(itr, end, "module");
@@ -520,7 +518,7 @@ LefDefParser::readVerilog(const std::filesystem::path& path)
       exit(0);
     }
     else
-      moduleName = *itr;
+      designName_ = *itr;
   }
 
   while(++itr != end && *itr != ";") 
@@ -562,7 +560,20 @@ LefDefParser::readVerilog(const std::filesystem::path& path)
     }
     else 
     {
-      LefMacro* lefMacro = macroMap_[std::move(*itr)];
+			std::string macroName = std::move(*itr);
+
+			auto checkMacro = macroMap_.find(macroName);
+
+			LefMacro* lefMacro;
+
+			if(checkMacro == macroMap_.end() )
+			{
+				std::cout << "Error - Macro " << macroName << " ";
+				std::cout << "is not found in the LEF." << std::endl;
+				exit(0);
+			}
+			else
+				lefMacro = checkMacro->second;
 
       if(++itr == end) 
       {
@@ -589,13 +600,13 @@ LefDefParser::readVerilog(const std::filesystem::path& path)
         else 
         {
           netName   = std::move( str );
-					int netID = strToNetID_[netName];
-					int pinID = numPin_;
+          int netID = strToNetID_[netName];
+          int pinID = numPin_;
 
-					std::string pinName = portName + ":" + cellName;
-					dbPin pin(pinID, cellID, netID, pinName, lefMacro->getPin(portName));
+          std::string pinName = portName + ":" + cellName;
+          dbPin pin(pinID, cellID, netID, pinName, lefMacro->getPin(portName));
 
-					dbPinInsts_.push_back(pin);
+          dbPinInsts_.push_back(pin);
           numPin_++;
         }
       });
@@ -606,8 +617,15 @@ LefDefParser::readVerilog(const std::filesystem::path& path)
       if(*(++itr) != ";") 
         std::cout << "Missing ; in instance declaration" << std::endl;
 
-			dbCellInsts_.push_back(cell);
+      dbCellInsts_.push_back(cell);
       numInst_++;
+
+			if(numInst_ % 200000 == 0)
+			{
+				using namespace std;
+				cout << "Read ";
+				cout << setw(7) << right << numInst_ << " Instances..." << endl;
+			}
     }
   }
 
@@ -615,38 +633,188 @@ LefDefParser::readVerilog(const std::filesystem::path& path)
   dbPinPtrs_.reserve(numPin_);
   dbNetPtrs_.reserve(numNet_);
 
-	for(auto& cell : dbCellInsts_)
-		dbCellPtrs_.push_back(&cell);
+	// Make Pointer Vector
+  for(auto& cell : dbCellInsts_)
+    dbCellPtrs_.push_back(&cell);
 
-	for(auto& net : dbNetInsts_)
-		dbNetPtrs_.push_back(&net);
+	// Make Pointer Vector
+  for(auto& net : dbNetInsts_)
+    dbNetPtrs_.push_back(&net);
 
-	for(auto& pin : dbPinInsts_)
-	{
-		int cellID = pin.cid();
-		int netID  = pin.nid();
+	// Make Pointer Vector & Add Interconnect Information
+  for(auto& pin : dbPinInsts_)
+  {
+    int cellID = pin.cid();
+    int netID  = pin.nid();
 
-		dbCell* cellPtr = &( dbCellInsts_[cellID] );
-		dbNet*  netPtr  = &( dbNetInsts_[netID]   );
+    dbCell* cellPtr = &( dbCellInsts_[cellID] );
+    dbNet*  netPtr  = &( dbNetInsts_[netID]   );
 
-		cellPtr->addPin(&pin);
-		netPtr->addPin(&pin);
+    cellPtr->addPin(&pin);
+    netPtr->addPin(&pin);
 
-		pin.setCell( cellPtr ); 
-		pin.setNet( netPtr );
+    pin.setCell( cellPtr ); 
+    pin.setNet( netPtr );
 
-		dbPinPtrs_.push_back(&pin);
-	}
+    dbPinPtrs_.push_back(&pin);
+  }
 
   std::cout << "=================================="  << std::endl;
   std::cout << "  Netlist (.v) Statistic          "  << std::endl;
   std::cout << "=================================="  << std::endl;
-  std::cout << "| Module Name : " << moduleName << std::endl;
-  std::cout << "| Num PI      : " << numPI_     << std::endl;
-  std::cout << "| Num PO      : " << numPO_     << std::endl;
-  std::cout << "| Num Inst    : " << numInst_   << std::endl;
-  std::cout << "| Num Net     : " << numNet_    << std::endl;
-  std::cout << "| Num Pin     : " << numPin_    << std::endl;
+  std::cout << "| Module Name : " << designName_ << std::endl;
+  std::cout << "| Num PI      : " << numPI_      << std::endl;
+  std::cout << "| Num PO      : " << numPO_      << std::endl;
+  std::cout << "| Num Inst    : " << numInst_    << std::endl;
+  std::cout << "| Num Net     : " << numNet_     << std::endl;
+  std::cout << "| Num Pin     : " << numPin_     << std::endl;
+  std::cout << "=================================="  << std::endl;
+}
+
+void
+LefDefParser::readDefRow(strIter& itr, const strIter& end)
+{
+	std::string rowName;
+  std::string siteName;
+
+  std::string siteOrient;
+
+  int origX = 0;
+  int origY = 0;
+
+  int numSiteX = 0;
+  int numSiteY = 0;
+
+  int stepX = 0;
+  int stepY = 0;
+
+  rowName  = std::move( *(++itr) );
+  siteName = std::move( *(++itr) );
+    
+  origX = std::stoi( *(++itr) );
+  origY = std::stoi( *(++itr) );
+
+  siteOrient = std::move( *(++itr) );
+
+  assert( *(++itr) == "DO" );
+
+  numSiteX = std::stoi( *(++itr) );
+
+  assert( *(++itr) == "BY" );
+
+  numSiteY = std::stoi( *(++itr) );
+
+  assert( *(++itr) == "STEP" );
+
+  stepX = std::stoi( *(++itr) );
+
+  stepY = std::stoi( *(++itr) );
+
+	auto checkSite = siteMap_.find(siteName);
+
+	LefSite* lefSite;
+
+	if(checkSite == siteMap_.end() )
+	{
+		std::cout << "Error - Site " << siteName << " ";
+		std::cout << " is not found in the LEF." << std::endl;
+		exit(0);
+	}
+	else
+		lefSite = checkSite->second;
+
+	dbRow row(rowName, lefSite, 
+			      dbUnit_,
+			      origX, origY, 
+						numSiteX, numSiteY,
+						stepX, stepY);
+
+	dbRowInsts_.push_back(row);
+
+  numRow_++;
+}
+
+void 
+LefDefParser::readDefDie(strIter& itr, const strIter& end)
+{
+  int lx = 0;
+  int ly = 0;
+
+  int ux = 0;
+  int uy = 0;
+
+  while(++itr != end)
+  {
+    if( *(itr) == "(" )
+    {
+      lx = std::stoi(*(++itr));
+      ly = std::stoi(*(++itr));
+      assert( *(++itr) == ")" );
+      assert( *(++itr) == "(" );
+      ux = std::stoi(*(++itr));
+      uy = std::stoi(*(++itr));
+      assert( *(++itr) == ")" );
+      break;
+    }
+  }
+
+  if(itr == end)
+  {
+    std::cout << "Syntax Error in DEF." << std::endl;
+    exit(0);
+  }
+
+  std::cout << "Die Lx: " << lx << std::endl;
+  std::cout << "Die Ly: " << ly << std::endl;
+  std::cout << "Die Ux: " << ux << std::endl;
+  std::cout << "Die Uy: " << uy << std::endl;
+}
+
+
+void 
+LefDefParser::readDef(const std::filesystem::path& fileName)
+{
+  std::cout << "readDef: " << fileName << std::endl;
+
+  static std::string_view delimiters = "#;";
+  static std::string_view exceptions = "";
+  
+  auto tokens = tokenize(fileName, delimiters, exceptions);
+
+  auto itr = tokens.begin();
+  auto end = tokens.end();
+
+  std::string designName;
+
+  int numComponent = 0;
+  int numPin       = 0;
+  int numRow       = 0;
+  int numNet       = 0;
+
+  while(++itr != end) 
+  {
+    if(*itr == "DESIGN")
+      designName = std::move( *(++itr) );
+    else if(*itr == "DIEAREA")
+      readDefDie(itr, end);
+    else if(*itr == "ROW")
+      readDefRow(itr, end);
+//    else if(*itr == "COMPONENTS")
+//      readDefComponents(itr, end, numComponent);
+//    else if(*itr == "PINS")
+//      readDefPins(itr, end, numPin);
+    else if(*itr == "END" && *(itr + 1) == "DESIGN")
+      break;
+  }
+
+  std::cout << "=================================="  << std::endl;
+  std::cout << "  DEF Statistic                   "  << std::endl;
+  std::cout << "=================================="  << std::endl;
+  std::cout << "| Design Name    : " << designName   << std::endl;
+  std::cout << "| Num ROWS       : " << numRow       << std::endl;
+  std::cout << "| Num COMPONENTS : " << numComponent << std::endl;
+  std::cout << "| Num PINS       : " << numPin       << std::endl;
+  std::cout << "| Num NETS       : " << numNet       << std::endl;
   std::cout << "=================================="  << std::endl;
 }
 
