@@ -4,6 +4,7 @@
 #include <unordered_map>
 #include <string>
 #include <filesystem>
+#include <climits>
 
 namespace LefDefDB
 {
@@ -17,10 +18,6 @@ enum PinDirection  {INPUT, OUTPUT, INOUT};
 enum PinUsage      {SIGNAL, POWER};
 enum CellOrient    {N, S, FN, FS};  // W E FW FE is not supported
 
-class LefMacro;
-class LefPin;
-class LefSite;
-
 struct LefRect
 {
   float lx;
@@ -31,6 +28,10 @@ struct LefRect
   LefRect(float lx, float ly, float ux, float uy)
     : lx(lx), ly(ly), ux(ux), uy(uy) {}
 };
+
+class LefMacro;
+class LefPin;
+class LefSite;
 
 class dbCell;
 class dbPin;
@@ -131,16 +132,14 @@ class LefMacro
 
     // Getters
     MacroClass macroClass() const { return macroClass_; }
+    LefSite*         site() const { return macroSite_;  }
+    std::string      name() const { return macroName_;  }
 
-    LefSite* site() const { return macroSite_; }
+    float           sizeX() const { return sizeX_;      }
+    float           sizeY() const { return sizeY_;      }
 
-    std::string name() const { return macroName_; }
-
-    float sizeX() const { return sizeX_; }
-    float sizeY() const { return sizeY_; }
-
-    float origX() const { return origX_; }
-    float origY() const { return origY_; }
+    float           origX() const { return origX_;      }
+    float           origY() const { return origY_;      }
 
     const std::vector<LefPin>& pins() const { return pins_; }
 
@@ -198,13 +197,29 @@ class dbPin
 {
   public:
 
-    dbPin() {}
+    // for external pins (when parsing PI/PO)
+    dbPin(int pinID, 
+          int netID,
+          bool isPI,
+          bool isPO,
+          std::string&  pinName,
+          const LefPin* lefPin)
+      : id_        (pinID    ),
+        nid_       (netID    ),
+        pinName_   (pinName  ),
+        lefPin_    (lefPin   ),
+				isPI_      (isPI     ),
+				isPO_      (isPO     )
+    {
+      cid_        = INT_MAX;
+      isExternal_ = true;
+    }
 
     // for internal pins
     dbPin(int pinID, 
           int cellID, 
           int netID,
-          std::string pinName,
+          std::string& pinName,
           const LefPin* lefPin)
 
       : id_        (pinID    ),
@@ -212,24 +227,28 @@ class dbPin
         nid_       (netID    ),
         pinName_   (pinName  ),
         lefPin_    (lefPin   )
-    {}
+    {
+      isExternal_ = false;
+      isPI_       = false;
+      isPO_       = false;
+    }
 
     // Setters
-    void setNet(dbNet* net)      { dbNet_  = net;          }
-    void setCell(dbCell* cell)   { dbCell_ = cell;         }
+    void setNet  (dbNet*   net)  { dbNet_  = net;          }
+    void setCell (dbCell* cell)  { dbCell_ = cell;         }
 
     // Getters
-    int         id()       const { return id_;             }
-    int        cid()       const { return cid_;            }
-    int        nid()       const { return nid_;            }
+    int               id() const { return id_;             }
+    int              cid() const { return cid_;            }
+    int              nid() const { return nid_;            }
 
     std::string  pinName() const { return pinName_;        }
     std::string portName() const { return lefPin_->name(); }
 
-    dbCell* cell() const { return dbCell_;  }
-    dbNet*   net() const { return dbNet_;   }
+    dbCell*         cell() const { return dbCell_;         }
+    dbNet*           net() const { return dbNet_;          }
 
-    const LefPin* lefPin() const { return lefPin_;  }
+    const LefPin* lefPin() const { return lefPin_;         }
 
   private:
 
@@ -237,14 +256,18 @@ class dbPin
     int cid_;
     int nid_;
 
+    // Size in dbu
+    int sizeX_;
+    int sizeY_;
+
     std::string pinName_;
 
     dbCell* dbCell_;
     dbNet*  dbNet_;
 
-		bool isExternal_;
-		bool isPI_;
-		bool isPO_;
+    bool isExternal_;
+    bool isPI_;
+    bool isPO_;
 
     const LefPin* lefPin_;
 };
@@ -260,10 +283,12 @@ class dbCell
     {}
 
     // Setters
-    void setName       (std::string& name     ) { cellName_ = name;         }
-    void setLefMacro   (LefMacro* lefMacro    ) { lefMacro_ = lefMacro;     }
+    void setName       (std::string& name     ) { cellName_   = name;       }
+    void setLefMacro   (LefMacro* lefMacro    ) { lefMacro_   = lefMacro;   }
     void setCellOrient (CellOrient cellOrient ) { cellOrient_ = cellOrient; }
-    void setFixed      (bool isFixed          ) { isFixed_ = isFixed;       }
+    void setFixed      (bool isFixed          ) { isFixed_    = isFixed;    }
+    void setLx         (int lx                ) { lx_         = lx;         }
+    void setLy         (int ly                ) { ly_         = ly;         }
     void addPin        (dbPin* pin            ) { pins_.push_back(pin);     }
 
     // Getters
@@ -274,7 +299,6 @@ class dbCell
     LefMacro*   lefMacro()  const { return lefMacro_;   }
     bool         isFixed()  const { return isFixed_;    }
     CellOrient    orient()  const { return cellOrient_; }
-
 
     const std::vector<dbPin*>& pins() const { return pins_; }
 
@@ -303,7 +327,7 @@ class dbRow
     dbRow() {}
     dbRow(std::string& rowName,
           LefSite* lefSite,
-					int lefUnit,
+          int lefUnit,
           int origX, 
           int origY, 
           int numSiteX, 
@@ -317,12 +341,12 @@ class dbRow
         stepX_    ( stepX    ),
         stepY_    ( stepY    )
     {
-			sizeX_ =
-				static_cast<int>(lefSite->sizeX() * numSiteX * lefUnit);
+      sizeX_ =
+        static_cast<int>(lefSite->sizeX() * numSiteX * lefUnit);
 
-			sizeY_ =
-				static_cast<int>(lefSite->sizeY() * numSiteY * lefUnit);
-		}
+      sizeY_ =
+        static_cast<int>(lefSite->sizeY() * numSiteY * lefUnit);
+    }
 
     // Getters
     std::string      name() const { return name_;    }
@@ -337,13 +361,13 @@ class dbRow
     int    stepX() const { return stepX_;    }
     int    stepY() const { return stepY_;    }
 
-		int    sizeX() const { return sizeX_;    }
-		int    sizeY() const { return sizeY_;    }
+    int    sizeX() const { return sizeX_;    }
+    int    sizeY() const { return sizeY_;    }
 
   private:
 
-		std::string name_;
-		LefSite*    lefSite_;
+    std::string name_;
+    LefSite*    lefSite_;
 
     int origX_;
     int origY_;
@@ -354,27 +378,37 @@ class dbRow
     int stepX_;
     int stepY_;
 
-		int sizeX_;
-		int sizeY_;
+    int sizeX_;
+    int sizeY_;
 };
 
 class dbDie
 {
-	public:
+  public:
 
-		dbDie() {}
+    dbDie() {}
 
-		int lx() const { return lx_; }
-		int ly() const { return ly_; }
-		int ux() const { return ux_; }
-		int uy() const { return uy_; }
+    // Setters
+    void setCoordi(int lx, int ly, int ux, int uy)
+    {
+      lx_ = lx;
+      ly_ = ly;
+      ux_ = ux;
+      uy_ = uy;
+    }
 
-	private:
+    // Getters
+    int lx() const { return lx_; }
+    int ly() const { return ly_; }
+    int ux() const { return ux_; }
+    int uy() const { return uy_; }
 
-		int lx_;
-		int ly_;
-		int ux_;
-		int uy_;
+  private:
+
+    int lx_;
+    int ly_;
+    int ux_;
+    int uy_;
 };
 
 class LefDefParser
@@ -383,59 +417,66 @@ class LefDefParser
     
     LefDefParser();
 
-		// APIs
-    void readLef     (const std::filesystem::path& path);                  // Read LEF
-    void readDef     (const std::filesystem::path& path);                  // Read DEF
-    void readVerilog (const std::filesystem::path& path);                  // Read Netlist (.v)
+    // APIs
+    void readLef     (const std::filesystem::path& path);                      // Read LEF
+    void readDef     (const std::filesystem::path& path);                      // Read DEF
+    void readVerilog (const std::filesystem::path& path);                      // Read Netlist (.v)
 
-		// Getters
-    std::vector<dbCell*> cells() const { return dbCellPtrs_; }             // List of DEF COMPONENTS
-    std::vector<dbPin*>   pins() const { return dbPinPtrs_;  }             // List of Internal + External Pins
-    std::vector<dbNet*>   nets() const { return dbNetPtrs_;  }             // List of Nets
-    std::vector<dbRow*>   rows() const { return dbRowPtrs_;  }             // List of DEF ROWS
+    // Getters
+    std::vector<dbCell*> cells() const { return dbCellPtrs_; }                 // List of DEF COMPONENTS
+    std::vector<dbPin*>   pins() const { return dbPinPtrs_;  }                 // List of Internal + External Pins
+    std::vector<dbNet*>   nets() const { return dbNetPtrs_;  }                 // List of Nets
+    std::vector<dbRow*>   rows() const { return dbRowPtrs_;  }                 // List of DEF ROWS
 
-		const dbDie*           die() const { return &die_;       }             // Ptr of dbDie
+    const dbDie*           die() const { return &die_;       }                 // Ptr of dbDie
 
-		std::string     designName() const { return designName_; }             // Returns the top module name (from .v)
+    std::string     designName() const { return designName_; }                 // Returns the top module name (from .v)
 
   private:
 
-    std::vector<std::string> tokenize(const std::filesystem::path& path,   // Tokenize strings of inputfile
-                                            std::string_view dels,         // Delimiters
-                                            std::string_view exps);        // Exceptions
+    // Tokenize strings of input file
+    std::vector<std::string> tokenize(const std::filesystem::path& path,       // Input file (including file path)
+                                            std::string_view dels,             // Delimiters
+                                            std::string_view exps);            // Exceptions
 
     // LEF-related
-    int dbUnit_;                                                           // LEF DATABASE MICRONS
+    int dbUnit_;                                                               // LEF DATABASE MICRONS
 
-    std::vector<LefMacro> macros_;                                         // List of LEF MACROS
-    std::vector<LefSite>   sites_;                                         // List of LEF SITES
+    std::vector<LefMacro> macros_;                                             // List of LEF MACROS
+    std::vector<LefSite>   sites_;                                             // List of LEF SITES
 
-    std::unordered_map<std::string, LefMacro*> macroMap_;                  // Name - MACRO Table
-    std::unordered_map<std::string, LefSite*>   siteMap_;                  // Name - SITE  Table
+    std::unordered_map<std::string, LefMacro*> macroMap_;                      // Name - MACRO Table
+    std::unordered_map<std::string, LefSite*>   siteMap_;                      // Name - SITE  Table
 
-    void readLefPort (strIter& itr, const strIter& end, LefPin*     pin);  // Read One LEF Port (Read Pin Shape and make LefRect)
-    void readLefPin  (strIter& itr, const strIter& end, LefMacro* macro);  // Read One LEF Pin
-    void readLefMacro(strIter& itr, const strIter& end);                   // Read One LEF Macro
+    void readLefPinShape (strIter& itr, const strIter& end, LefPin*     pin);  // Read One LEF Pin Shape 
+    void readLefPin      (strIter& itr, const strIter& end, LefMacro* macro);  // Read One LEF Pin
+    void readLefMacro    (strIter& itr, const strIter& end);                   // Read One LEF Macro
 
-    void readLefSite (strIter& itr, const strIter& end);                   // Read One LEF Site
-    void readLefUnit (strIter& itr, const strIter& end);                   // Read LEF DATABASE MICRONS
+    void readLefSite     (strIter& itr, const strIter& end);                   // Read One LEF Site
+    void readLefUnit     (strIter& itr, const strIter& end);                   // Read LEF DATABASE MICRONS
 
-    void printLefStatistic() const;                                        // Print LEF Statistic (for debugging)
+    void printLefStatistic() const;                                            // Print LEF Statistic (for debugging)
 
-    std::unordered_map<std::string, MacroClass>   strToMacroClass_;        // String - enum MACRO CLASS     Table
-    std::unordered_map<std::string, SiteClass>    strToSiteClass_;         // String - enum SITE  CLASS     Table
-    std::unordered_map<std::string, PinDirection> strToPinDirection_;      // String - enum Pin   DIRECTION Table
-    std::unordered_map<std::string, PinUsage>     strToPinUsage_;          // String - enum Pin   USAGE     Table
+    std::unordered_map<std::string, MacroClass>   strToMacroClass_;            // String - enum MACRO     CLASS     Table
+    std::unordered_map<std::string, SiteClass>    strToSiteClass_;             // String - enum SITE      CLASS     Table
+    std::unordered_map<std::string, PinDirection> strToPinDirection_;          // String - enum PIN       DIRECTION Table
+    std::unordered_map<std::string, PinUsage>     strToPinUsage_;              // String - enum PIN       USAGE     Table
+    std::unordered_map<std::string, CellOrient>   strToCellOrient_;            // String - enum COMPONENT ORIENT    Table
 
 
     // Verilog-related
-		std::string designName_;
+    std::string designName_;                                                   // Top Module name
 
-    int numPI_;
-    int numPO_;
-    int numInst_;
-    int numNet_;
-    int numPin_;
+    int numPI_;                                                                // Number of PI (Primary Input )
+    int numPO_;                                                                // Number of PO (Primary Output)
+    int numInst_;                                                              // Number of Instances
+    int numNet_;                                                               // Number of Nets
+    int numPin_;                                                               // Number of Pins
+    int numDummy_;                                                             // Number of Dummy Cells
+    // In the ICCAD 2015 supberblue benchmarks, 
+    // there are some cells that exist in DEF
+    // but not in the Verilog,
+    // We will call them "Dummy Cells".
 
     std::vector<dbCell*> dbCellPtrs_;
     std::vector<dbCell>  dbCellInsts_;
@@ -450,9 +491,10 @@ class LefDefParser
     std::unordered_map<std::string, int> strToNetID_;
 
     // DEF-related
-		int numRow_;
+    int numRow_;
+		int numDefComponents_;
 
-		dbDie die_;
+    dbDie die_;
 
     std::vector<dbRow>   dbRowInsts_;
     std::vector<dbRow*>  dbRowPtrs_;

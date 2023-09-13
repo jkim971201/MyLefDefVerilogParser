@@ -180,7 +180,7 @@ LefDefParser::tokenize(const std::filesystem::path& path,
   std::string token;
   std::vector<std::string> tokens;
 
-  for(size_t i=0; i<fsize; ++i) 
+  for(size_t i = 0; i < fsize; ++i) 
   {
     auto c = buffer[i];
     bool is_del = (dels.find(c) != std::string_view::npos);
@@ -210,12 +210,14 @@ LefDefParser::tokenize(const std::filesystem::path& path,
 }
 
 LefDefParser::LefDefParser()
-  : numPI_      (0),
-    numPO_      (0),
-    numInst_    (0),
-    numNet_     (0),
-    numPin_     (0),
-    numRow_     (0)
+  : numPI_             (0),
+    numPO_             (0),
+    numInst_           (0),
+    numNet_            (0),
+    numPin_            (0),
+    numRow_            (0),
+    numDummy_          (0),
+		numDefComponents_  (0)
 {
   strToMacroClass_["CORE"       ] = MacroClass::CORE;
   strToMacroClass_["CORE_SPACER"] = MacroClass::CORE_SPACER;
@@ -231,10 +233,15 @@ LefDefParser::LefDefParser()
 
   strToPinUsage_["SIGNAL"] = PinUsage::SIGNAL;
   strToPinUsage_["POWER" ] = PinUsage::POWER;
+
+  strToCellOrient_["N" ] = CellOrient::N;
+  strToCellOrient_["S" ] = CellOrient::S;
+  strToCellOrient_["FN"] = CellOrient::FN;
+  strToCellOrient_["FS"] = CellOrient::FS;
 }
 
 void 
-LefDefParser::readLefPort(strIter& itr, const strIter& end, LefPin* lefPin)
+LefDefParser::readLefPinShape(strIter& itr, const strIter& end, LefPin* lefPin)
 {
   std::string portName;
   std::string layerName;
@@ -292,14 +299,38 @@ LefDefParser::readLefPin(strIter& itr, const strIter& end, LefMacro* lefMacro)
       pinUsage = *(++itr);
 
     else if(*itr == "PORT")
-      readLefPort(itr, end, &lefPin);
+      readLefPinShape(itr, end, &lefPin);
   
     else if(*itr == "END" && *(itr + 1) == pinName)
       break;
   }
 
-  lefPin.setPinUsage(strToPinUsage_[pinUsage]);
-  lefPin.setPinDirection(strToPinDirection_[pinDirection]);
+	PinUsage     pUsage;
+	PinDirection pDirection;
+
+	auto pinUsageCheck      = strToPinUsage_.find(pinUsage);
+	auto pinDirectionCheck  = strToPinDirection_.find(pinDirection);
+
+	if(pinUsageCheck == strToPinUsage_.end())
+	{
+		std::cout << "Error - PIN USAGE " << pinUsage;
+		std::cout << " is not supported yet." << std::endl;
+		exit(0);
+	}
+	else
+		pUsage = pinUsageCheck->second;
+
+	if(pinDirectionCheck == strToPinDirection_.end())
+	{
+		std::cout << "Error - PIN DIRECTION " << pDirection;
+		std::cout << " is not supported yet." << std::endl;
+		exit(0);
+	}
+	else
+		pDirection = pinDirectionCheck->second;
+
+  lefPin.setPinUsage( pUsage );
+  lefPin.setPinDirection( pDirection );
 
   lefMacro->addPin(lefPin);
 
@@ -354,8 +385,35 @@ LefDefParser::readLefMacro(strIter& itr, const strIter& end)
       break;
   }
 
-  lefMacro.setClass( strToMacroClass_[macroClass] );
-  lefMacro.setSite ( siteMap_[siteName] );
+	MacroClass mcClass;
+	LefSite* lefSite;
+
+	auto classCheck = strToMacroClass_.find(macroClass);
+	auto siteCheck  = siteMap_.find(siteName);
+
+	if(classCheck == strToMacroClass_.end())
+	{
+		std::cout << "Error - CLASS " << macroClass;
+		std::cout << " is not supported yet." << std::endl;
+		exit(0);
+	}
+	else
+		mcClass = classCheck->second;
+	
+	if(siteCheck == siteMap_.end())
+	{
+		if(macroClass != "BLOCK") // BLOCK MACRO does not have SITE
+		{
+			std::cout << "Error - SITE " << siteName;
+			std::cout << " is not found in the LEF." << std::endl;
+			exit(0);
+		}
+	}
+	else
+		lefSite = siteCheck->second;
+
+  lefMacro.setClass( mcClass );
+  lefMacro.setSite ( lefSite );
 
   lefMacro.setSizeX(sizeX);
   lefMacro.setSizeY(sizeY);
@@ -401,9 +459,19 @@ LefDefParser::readLefSite(strIter& itr, const strIter& end)
       break;
   }
 
-  LefSite lefSite(siteName, 
-                  strToSiteClass_[siteClass],
-                  sizeX, sizeY);
+	SiteClass sClass;
+	auto siteClassCheck = strToSiteClass_.find(siteClass);
+
+	if(siteClassCheck == strToSiteClass_.end())
+	{
+		std::cout << "Error - SITE CLASS " << siteClass;
+		std::cout << " is not supported yet." << std::endl;
+		exit(0);
+	}
+	else
+		sClass = siteClassCheck->second;
+
+  LefSite lefSite(siteName, sClass, sizeX, sizeY);
 
   sites_.push_back(lefSite);
 
@@ -537,12 +605,16 @@ LefDefParser::readVerilog(const std::filesystem::path& path)
     else if(*itr == "input") 
     {
       while(++itr != end && *itr != ";") 
+			{
         numPI_++;
+			}
     }
     else if(*itr == "output") 
     {
       while(++itr != end && *itr != ";") 
+			{
         numPO_++;
+			}
     }
     else if(*itr == "wire") 
     {
@@ -560,20 +632,20 @@ LefDefParser::readVerilog(const std::filesystem::path& path)
     }
     else 
     {
-			std::string macroName = std::move(*itr);
+      std::string macroName = std::move(*itr);
 
-			auto checkMacro = macroMap_.find(macroName);
+      auto checkMacro = macroMap_.find(macroName);
 
-			LefMacro* lefMacro;
+      LefMacro* lefMacro;
 
-			if(checkMacro == macroMap_.end() )
-			{
-				std::cout << "Error - Macro " << macroName << " ";
-				std::cout << "is not found in the LEF." << std::endl;
-				exit(0);
-			}
-			else
-				lefMacro = checkMacro->second;
+      if(checkMacro == macroMap_.end() )
+      {
+        std::cout << "Error - Macro " << macroName << " ";
+        std::cout << "is not found in the LEF." << std::endl;
+        exit(0);
+      }
+      else
+        lefMacro = checkMacro->second;
 
       if(++itr == end) 
       {
@@ -620,12 +692,12 @@ LefDefParser::readVerilog(const std::filesystem::path& path)
       dbCellInsts_.push_back(cell);
       numInst_++;
 
-			if(numInst_ % 200000 == 0)
-			{
-				using namespace std;
-				cout << "Read ";
-				cout << setw(7) << right << numInst_ << " Instances..." << endl;
-			}
+      if(numInst_ % 200000 == 0)
+      {
+        using namespace std;
+        cout << "Read ";
+        cout << setw(7) << right << numInst_ << " Instances..." << endl;
+      }
     }
   }
 
@@ -633,15 +705,15 @@ LefDefParser::readVerilog(const std::filesystem::path& path)
   dbPinPtrs_.reserve(numPin_);
   dbNetPtrs_.reserve(numNet_);
 
-	// Make Pointer Vector
+  // Make Pointer Vector
   for(auto& cell : dbCellInsts_)
     dbCellPtrs_.push_back(&cell);
 
-	// Make Pointer Vector
+  // Make Pointer Vector
   for(auto& net : dbNetInsts_)
     dbNetPtrs_.push_back(&net);
 
-	// Make Pointer Vector & Add Interconnect Information
+  // Make Pointer Vector & Add Interconnect Information
   for(auto& pin : dbPinInsts_)
   {
     int cellID = pin.cid();
@@ -674,7 +746,7 @@ LefDefParser::readVerilog(const std::filesystem::path& path)
 void
 LefDefParser::readDefRow(strIter& itr, const strIter& end)
 {
-	std::string rowName;
+  std::string rowName;
   std::string siteName;
 
   std::string siteOrient;
@@ -710,26 +782,26 @@ LefDefParser::readDefRow(strIter& itr, const strIter& end)
 
   stepY = std::stoi( *(++itr) );
 
-	auto checkSite = siteMap_.find(siteName);
+  auto checkSite = siteMap_.find(siteName);
 
-	LefSite* lefSite;
+  LefSite* lefSite;
 
-	if(checkSite == siteMap_.end() )
-	{
-		std::cout << "Error - Site " << siteName << " ";
-		std::cout << " is not found in the LEF." << std::endl;
-		exit(0);
-	}
-	else
-		lefSite = checkSite->second;
+  if(checkSite == siteMap_.end() )
+  {
+    std::cout << "Error - Site " << siteName;
+    std::cout << " is not found in the LEF." << std::endl;
+    exit(0);
+  }
+  else
+    lefSite = checkSite->second;
 
-	dbRow row(rowName, lefSite, 
-			      dbUnit_,
-			      origX, origY, 
-						numSiteX, numSiteY,
-						stepX, stepY);
+  dbRow row(rowName, lefSite, 
+            dbUnit_,
+            origX, origY, 
+            numSiteX, numSiteY,
+            stepX, stepY);
 
-	dbRowInsts_.push_back(row);
+  dbRowInsts_.push_back(row);
 
   numRow_++;
 }
@@ -764,12 +836,126 @@ LefDefParser::readDefDie(strIter& itr, const strIter& end)
     exit(0);
   }
 
-  std::cout << "Die Lx: " << lx << std::endl;
-  std::cout << "Die Ly: " << ly << std::endl;
-  std::cout << "Die Ux: " << ux << std::endl;
-  std::cout << "Die Uy: " << uy << std::endl;
+  die_.setCoordi(lx, ly, ux, uy);
 }
 
+void
+LefDefParser::readDefOneComponent(strIter& itr, const strIter& end)
+{
+  std::string instName;
+  std::string macroName;
+
+  std::string cellStatus;
+
+  LefMacro* lefMacro;
+
+  int coordiX = 0;
+  int coordiY = 0;
+
+  std::string cellOrient;
+
+  instName = std::move( *(++itr) );
+
+  macroName = std::move( *(++itr) );
+
+  assert( *(++itr) == "+" );
+
+  cellStatus = std::move( *(++itr) );
+
+  assert( *(++itr) == "(" );
+
+  coordiX = std::stoi( *(++itr));
+
+  coordiY = std::stoi( *(++itr));
+
+  assert( *(++itr) == ")" );
+
+  cellOrient = std::move( *(++itr) );
+
+  int cellID;
+  auto checkCell  = strToCellID_.find(instName);
+  auto checkMacro = macroMap_.find(macroName);
+
+  bool isFixed = (cellStatus == "FIXED") ? true : false;
+
+  if(checkMacro == macroMap_.end() )
+  {
+    std::cout << "Error - Macro " << macroName << " ";
+    std::cout << "is not found in the LEF." << std::endl;
+    exit(0);
+  }
+  else
+    lefMacro = checkMacro->second;
+
+  dbCell* cell;
+
+  if(checkCell == strToCellID_.end())
+  {
+    // These components do not exist in the Verilog file
+    // but they do exist in the DEF file
+    // I don't know why...
+    cellID = numInst_;
+
+    dbCell newCell(cellID, instName, lefMacro);
+
+    dbCellInsts_.push_back(newCell);
+
+    cell = &newCell;
+
+    numInst_++;
+    numDummy_++;
+  }
+  else
+  {
+    cellID = checkCell->second;
+    cell   = dbCellPtrs_[cellID];
+  }
+
+
+	CellOrient orient;
+	auto orientCheck = strToCellOrient_.find(cellOrient);
+
+	if(orientCheck == strToCellOrient_.end())
+	{
+		std::cout << "Error - ORIENT " << cellOrient;
+		std::cout << " is not supported yet." << std::endl;
+		exit(0);
+	}
+	else
+		orient = orientCheck->second;
+
+  cell->setCellOrient(orient);
+
+  cell->setLx(coordiX);
+  cell->setLy(coordiY);
+
+	numDefComponents_++;
+
+	if(numDefComponents_ % 200000 == 0)
+	{
+		using namespace std;
+		cout << "Read " << setw(7) << numDefComponents_ << " Components..." << endl;
+	}
+}
+
+void
+LefDefParser::readDefComponents(strIter& itr, const strIter& end)
+{
+	int defComponents = std::stoi( std::move( *(++itr) ) );
+
+  while(++itr != end)
+  {
+    if(*itr == "-")
+      readDefOneComponent(itr, end);
+    else if(*itr == "END" && *(++itr) == "COMPONENTS")
+      break;
+    else
+    {
+      std::cout << "Syntax Error while Reading DEF COMPONENTS" << std::endl;
+      exit(0);
+    }
+  }
+}
 
 void 
 LefDefParser::readDef(const std::filesystem::path& fileName)
@@ -799,13 +985,17 @@ LefDefParser::readDef(const std::filesystem::path& fileName)
       readDefDie(itr, end);
     else if(*itr == "ROW")
       readDefRow(itr, end);
-//    else if(*itr == "COMPONENTS")
-//      readDefComponents(itr, end, numComponent);
+    else if(*itr == "COMPONENTS")
+      readDefComponents(itr, end);
 //    else if(*itr == "PINS")
 //      readDefPins(itr, end, numPin);
     else if(*itr == "END" && *(itr + 1) == "DESIGN")
       break;
   }
+
+  // Make Row Ptrs
+  for(auto& r : dbRowInsts_)
+    dbRowPtrs_.push_back(&r);
 
   std::cout << "=================================="  << std::endl;
   std::cout << "  DEF Statistic                   "  << std::endl;
