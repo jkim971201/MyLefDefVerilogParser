@@ -112,10 +112,10 @@ LefPin::computeBBox()
       maxY = uy;
   }
 
-	lx_ = minX;
-	ly_ = minY;
-	ux_ = maxX;
-	uy_ = maxY;
+  lx_ = minX;
+  ly_ = minY;
+  ux_ = maxX;
+  uy_ = maxY;
 }
 
 std::vector<std::string>
@@ -226,12 +226,13 @@ LefDefParser::tokenize(const std::filesystem::path& path,
 LefDefParser::LefDefParser()
   : numPI_             (   0),
     numPO_             (   0),
+    numIO_             (   0),
     numInst_           (   0),
     numNet_            (   0),
     numPin_            (   0),
     numRow_            (   0),
     numDummy_          (   0),
-    numDefComponents_  (   0),
+    numDefComps_       (   0),
     dbUnit_            (1000)
 {
   strToMacroClass_["CORE"       ] = MacroClass::CORE;
@@ -346,7 +347,7 @@ LefDefParser::readLefPin(strIter& itr, const strIter& end, LefMacro* lefMacro)
 
   lefPin.setPinUsage( pUsage );
   lefPin.setPinDirection( pDirection );
-	lefPin.computeBBox();
+  lefPin.computeBBox();
 
   lefMacro->addPin(lefPin);
 
@@ -618,42 +619,51 @@ LefDefParser::readVerilog(const std::filesystem::path& path)
   {
     if(*itr == "endmodule") 
       break;
-    else if(*itr == "input" | *itr == "output") 
+    else if(*itr == "input"  || 
+            *itr == "output" || 
+            *itr == "inout") 
     {
-      bool isPI = false;
-      bool isPO = false;
+      PinDirection direction;
 
       if(*itr == "input")
-        isPI = true;
-      else
-        isPO = true;
+        direction = PinDirection::INPUT;
+      else if(*itr == "output")
+        direction = PinDirection::OUTPUT;
+      else if(*itr == "inout" )
+        direction = PinDirection::INOUT;
 
       while(++itr != end && *itr != ";") 
       {
         std::string pinName = std::move( *(itr) );
         std::string netName = pinName;
+        std::string ioName  = pinName;
 
         int pinID = numPin_;
         int netID = numNet_;
+        int  ioID = numIO_;
 
-        dbPin pinPI(pinID, 
-                    netID, 
-                    isPI, 
-                    isPO,
-                    pinName);
+        dbIO io(ioID, direction, ioName);
 
-        dbNet netPI(netID, netName);
+        dbPin pin(pinID, 
+                  netID, 
+                  ioID,
+                  pinName);
 
-        dbPinInsts_.push_back(pinPI);
-        dbNetInsts_.push_back(netPI);
+        dbNet net(netID, netName);
+
+        dbPinInsts_.push_back(pin);
+        dbNetInsts_.push_back(net);
+        dbIOInsts_.push_back(io);
 
         strToPinID_[pinName] = pinID;
         strToNetID_[netName] = netID;
+        strToIOID_[ioName]   = ioID;
 
         numPin_++;
         numNet_++;
+        numIO_++;
 
-        if(isPI)
+        if(direction == PinDirection::INPUT)
           numPI_++;
         else
           numPO_++;
@@ -749,6 +759,7 @@ LefDefParser::readVerilog(const std::filesystem::path& path)
   dbCellPtrs_.reserve(numInst_);
   dbPinPtrs_.reserve(numPin_);
   dbNetPtrs_.reserve(numNet_);
+  dbIOPtrs_.reserve(numIO_);
 
   // Make Pointer Vector
   for(auto& cell : dbCellInsts_)
@@ -758,11 +769,16 @@ LefDefParser::readVerilog(const std::filesystem::path& path)
   for(auto& net : dbNetInsts_)
     dbNetPtrs_.push_back(&net);
 
+  // Make Pointer Vector
+  for(auto& io : dbIOInsts_)
+    dbIOPtrs_.push_back(&io);
+
   // Make Pointer Vector & Add Interconnect Information
   for(auto& pin : dbPinInsts_)
   {
     int cellID = pin.cid();
     int netID  = pin.nid();
+    int ioID   = pin.ioid();
 
     dbNet*  netPtr  = &( dbNetInsts_[netID]   );
     netPtr->addPin(&pin);
@@ -774,7 +790,12 @@ LefDefParser::readVerilog(const std::filesystem::path& path)
       cellPtr->addPin(&pin);
       pin.setCell( cellPtr ); 
     }
-
+    else // External Pin
+    {
+      dbIO* ioPtr = &( dbIOInsts_[ioID] );
+      ioPtr->setPin(&pin);
+      pin.setNet( netPtr );
+    }
     dbPinPtrs_.push_back(&pin);
   }
 
@@ -784,6 +805,7 @@ LefDefParser::readVerilog(const std::filesystem::path& path)
   std::cout << "| Module Name : " << designName_ << std::endl;
   std::cout << "| Num PI      : " << numPI_      << std::endl;
   std::cout << "| Num PO      : " << numPO_      << std::endl;
+  std::cout << "| Num IO      : " << numIO_      << std::endl;
   std::cout << "| Num Inst    : " << numInst_    << std::endl;
   std::cout << "| Num Net     : " << numNet_     << std::endl;
   std::cout << "| Num Pin     : " << numPin_     << std::endl;
@@ -959,12 +981,12 @@ LefDefParser::readDefOneComponent(strIter& itr, const strIter& end)
   cell->setLx(coordiX);
   cell->setLy(coordiY);
 
-  numDefComponents_++;
+  numDefComps_++;
 
-  if(numDefComponents_ % 200000 == 0)
+  if(numDefComps_ % 200000 == 0)
   {
     using namespace std;
-    cout << "Read " << setw(7) << numDefComponents_ << " Components..." << endl;
+    cout << "Read " << setw(7) << numDefComps_ << " Components..." << endl;
   }
 }
 
@@ -1059,28 +1081,36 @@ LefDefParser::readDefOnePin(strIter& itr, const strIter& end)
       itr++;
   }
 
-  std::cout << "PinName : " << pinName;
+  // pinName == IO pin name
+  int ioID;
 
-  std::cout << " NetName : " << netName;
+  bool isFixed = (pinStatus == "FIXED") ? true : false;
 
-  std::cout << " PinStatus : " << pinStatus << std::endl;
+  Orient orient = strToOrient_[pinOrient];
 
-  int pinID;
+	if(orient != Orient::N)
+	{
+		std::cout << "[WARNING] Orient " << pinOrient;
+		std::cout << " is not supported yet." << std::endl;
+		std::cout << "[WARNING] Orient will be regarded as N." << std::endl;
+	}
 
-  checkIfKeyExist(pinName, strToPinID_, pinID, "PIN");
+  checkIfKeyExist(pinName, strToIOID_, ioID, "PIN");
 
-  dbPin* pin = dbPinPtrs_[pinID];
+  dbIO* io = dbIOPtrs_[ioID];
 
-	//std::cout << "NetName in Verilog : " << pin->net()->name() << std::endl;
-	//std::cout << "NetName in DEF     : " << netName << std::endl;
+  assert(io->pin()->net()->name() == netName);
 
-  assert(pin->net()->name() == netName);
+  io->setLocation(originX, originY, 
+                  offsetLx, offsetLy, offsetUx, offsetUy);
+
+  io->setOrient(orient);
 }
 
 void
 LefDefParser::readDefPins(strIter& itr, const strIter& end)
 {
-	int numDefPins = std::stoi( *(++itr) );
+  int numDefPins = std::stoi( *(++itr) );
 
   while(++itr != end)
   {
@@ -1129,6 +1159,12 @@ LefDefParser::readDef(const std::filesystem::path& fileName)
       readDefComponents(itr, end);
     else if(*itr == "PINS")
       readDefPins(itr, end);
+		else if(*itr == "PROPERTYPEDEFINITIONS")
+		{
+			// Temporary code for ignoring type definitions
+			while(*itr != "END")
+			 itr++;
+		}
     else if(*itr == "END" && *(itr + 1) == "DESIGN")
       break;
   }
@@ -1140,11 +1176,10 @@ LefDefParser::readDef(const std::filesystem::path& fileName)
   std::cout << "=================================="  << std::endl;
   std::cout << "  DEF Statistic                   "  << std::endl;
   std::cout << "=================================="  << std::endl;
-  std::cout << "| Design Name    : " << designName   << std::endl;
-  std::cout << "| Num ROWS       : " << numRow       << std::endl;
-  std::cout << "| Num COMPONENTS : " << numComponent << std::endl;
-  std::cout << "| Num PINS       : " << numPin       << std::endl;
-  std::cout << "| Num NETS       : " << numNet       << std::endl;
+  std::cout << "| Design Name    : " << designName_  << std::endl;
+  std::cout << "| Num ROWS       : " << numRow_      << std::endl;
+  std::cout << "| Num COMPONENTS : " << numDefComps_ << std::endl;
+  std::cout << "| Num PINS       : " << numPin_      << std::endl;
   std::cout << "=================================="  << std::endl;
 }
 

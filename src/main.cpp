@@ -32,7 +32,7 @@ int main(int argc, char** argv)
 
   parser.readVerilog(fileName2);
 
-	parser.readDef(fileName3);
+  parser.readDef(fileName3);
 
   return 0;
 }

@@ -36,8 +36,7 @@ class LefSite;
 class dbCell;
 class dbPin;
 class dbNet;
-
-class verilogCell;
+class dbIO;
 
 class LefPin
 {
@@ -50,15 +49,15 @@ class LefPin
 
     // Setters
     void setPinUsage    (PinUsage     pinUsage) { pinUsage_ = pinUsage; }
-    void setPinDirection(PinDirection pinDir)   { pinDir_   = pinDir;   }
+    void setPinDirection(PinDirection pinDir  ) { pinDir_   = pinDir;   }
 
     void addLefRect(LefRect rect) { lefRect_.push_back(rect); }
 
     // Getters
-		float                 lx() const { return lx_;         }
-		float                 ly() const { return ly_;         }
-		float                 ux() const { return ux_;         }
-		float                 uy() const { return uy_;         }
+    float                 lx() const { return lx_;         }
+    float                 ly() const { return ly_;         }
+    float                 ux() const { return ux_;         }
+    float                 uy() const { return uy_;         }
 
     LefMacro*          macro() const { return lefMacro_;   }
     std::string         name() const { return pinName_;    }
@@ -79,10 +78,10 @@ class LefPin
 
     std::vector<LefRect> lefRect_;
 
-		float lx_;
-		float ly_;
-		float ux_;
-		float uy_;
+    float lx_;
+    float ly_;
+    float ux_;
+    float uy_;
 };
 
 class LefSite
@@ -157,9 +156,9 @@ class LefMacro
 
   private:
 
-    std::string    macroName_;
-    MacroClass     macroClass_;
-    LefSite* macroSite_;
+    std::string  macroName_;
+    MacroClass   macroClass_;
+    LefSite*     macroSite_;
 
     std::vector<LefPin> pins_;
 
@@ -208,18 +207,18 @@ class dbPin
     // for external pins (when parsing PI/PO)
     dbPin(int pinID, 
           int netID,
-          bool isPI,
-          bool isPO,
+          int  ioID,
           std::string&  pinName)
-      : id_        (pinID    ),
-        nid_       (netID    ),
-        pinName_   (pinName  ),
-        isPI_      (isPI     ),
-        isPO_      (isPO     )
+      : id_        (pinID   ),
+        nid_       (netID   ),
+        ioid_      (ioID    ),
+        pinName_   (pinName )
     {
       cid_        = INT_MAX;
-      isExternal_ = true;
       lefPin_     = nullptr;
+      dbCell_     = nullptr;
+
+      isExternal_ = true;
     }
 
     // for internal pins
@@ -235,64 +234,175 @@ class dbPin
         pinName_   (pinName  ),
         lefPin_    (lefPin   )
     {
+      ioid_ = INT_MAX;
+      dbIO_ = nullptr;
+  
+      offsetX_ = ( lefPin->lx() + lefPin->ux() ) / 2;
+      offsetY_ = ( lefPin->ly() + lefPin->uy() ) / 2;
+
       isExternal_ = false;
-      isPI_       = false;
-      isPO_       = false;
-	
-			cx_ = ( lefPin->lx() + lefPin->ly() ) / 2.0;
-			cy_ = ( lefPin->ux() + lefPin->uy() ) / 2.0;
     }
 
     // Setters
-    void setNet  (dbNet*   net)  { dbNet_  = net;          }
-    void setCell (dbCell* cell)  { dbCell_ = cell;         }
+    void setNet     (dbNet*   net) { dbNet_  = net;      }
+    void setCell    (dbCell* cell) { dbCell_ = cell;     }
+    void setIO      (dbIO*     io) { dbIO_   = io;       }
+
+    void setCx      (int       cx) { cx_     = cx;       }
+    void setCy      (int       cy) { cy_     = cy;       }
+
+    void setOffsetX (int  offsetX) { offsetX_ = offsetX; }
+    void setOffsetY (int  offsetY) { offsetY_ = offsetY; }
 
     // Getters
-    int               id() const { return id_;             }
-    int              cid() const { return cid_;            }
-    int              nid() const { return nid_;            }
+    int               id() const { return id_;         }
+    int              cid() const { return cid_;        }
+    int              nid() const { return nid_;        }
+    int             ioid() const { return ioid_;       }
 
-    int            sizeX() const { return sizeX_;          }
-    int            sizeY() const { return sizeY_;          }
-    int               cx() const { return cx_;             }
-    int               cy() const { return cy_;             }
+    int               cx() const { return cx_;         }
+    int               cy() const { return cy_;         }
+    int          offsetX() const { return offsetX_;    }
+    int          offsetY() const { return offsetY_;    }
 
-    std::string  pinName() const { return pinName_;        }
-    std::string portName() const { return lefPin_->name(); }
+    std::string     name() const { return pinName_;    }
 
-    dbCell*         cell() const { return dbCell_;         }
-    dbNet*           net() const { return dbNet_;          }
+    dbCell*         cell() const { return dbCell_;     }
+    dbNet*           net() const { return dbNet_;      }
+    dbIO*             io() const { return dbIO_;       }
 
-    const LefPin* lefPin() const { return lefPin_;         }
-
-    bool      isExternal() const { return isExternal_;     }
-    bool            isPI() const { return isPI_;           }
-    bool            isPO() const { return isPO_;           }
+    bool      isExternal() const { return isExternal_; }
+    const LefPin* lefPin() const { return lefPin_;     }
 
   private:
 
-    int id_;
-    int cid_;
-    int nid_;
+    int   id_; // Pin  ID
+    int  cid_; // Cell ID
+    int  nid_; // Net  ID
+    int ioid_; // IO   ID
 
-    // Size in dbu
-    int sizeX_;
-    int sizeY_;
+    // dbu
+    int cx_;
+    int cy_;
 
-		int cx_;
-		int cy_;
+    int offsetX_;
+    int offsetY_;
 
     std::string pinName_;
 
     dbCell* dbCell_;
     dbNet*  dbNet_;
+    dbIO*   dbIO_;
 
     bool isExternal_;
-    bool isPI_;
-    bool isPO_;
-
     const LefPin* lefPin_;
 };
+
+
+class dbIO
+{
+  public:
+
+    dbIO(int ioID, 
+         PinDirection direction,
+         std::string& name) 
+      : id_         (      ioID),
+        direction_  ( direction),
+        ioName_     (      name) 
+    {}
+
+    dbIO(int ioID, 
+         int origX,
+         int origY,
+         int offsetLx,  
+         int offsetLy,  
+         int offsetUx,  
+         int offsetUy,  
+         bool isFixed,
+         Orient orient,
+         PinDirection direction,
+         std::string& name) 
+      : id_         (      ioID),
+        origX_      (     origX),
+        origY_      (     origY),
+        offsetLx_   (  offsetLx),
+        offsetLy_   (  offsetLy),
+        offsetUx_   (  offsetUx),
+        offsetUy_   (  offsetUy),
+        orient_     (    orient),
+        direction_  ( direction),
+        ioName_     (      name) 
+    {}
+
+    // Getters
+    int           id() const { return id_;       }
+    int        origX() const { return origX_;    }
+    int        origY() const { return origY_;    }
+    int     offsetLx() const { return offsetLx_; }
+    int     offsetLy() const { return offsetLy_; }
+    int     offsetUx() const { return offsetUx_; }
+    int     offsetUy() const { return offsetUy_; }
+    bool     isFixed() const { return isFixed_;  }
+
+    dbPin*       pin() const { return pin_;      }
+    std::string name() const { return ioName_;   }
+
+    Orient          orient() const { return orient_;    }
+    PinDirection direction() const { return direction_; }
+
+    // Setters
+    void setOrigX     (int     origX) { origX_    = origX;    }
+    void setOrigY     (int     origY) { origY_    = origY;    }
+    void setOffsetLx  (int  offsetLx) { offsetLx_ = offsetLx; }
+    void setOffsetLy  (int  offsetLy) { offsetLy_ = offsetLy; }
+    void setOffsetUx  (int  offsetUx) { offsetUx_ = offsetUx; }
+    void setOffsetUy  (int  offsetUy) { offsetUy_ = offsetUy; }
+
+    void setLocation(int origX, int origY, 
+                     int offsetLx, int offsetLy, 
+                     int offsetUx, int offsetUy)
+    {
+      origX_    = origX;
+      origY_    = origY;
+      offsetLx_ = offsetLx;
+      offsetLy_ = offsetLy;
+      offsetUx_ = offsetUx;
+      offsetUy_ = offsetUy;
+
+      pin_->setCx(origX);
+      pin_->setCy(origY);
+
+      pin_->setOffsetX( (offsetLx + offsetUx) / 2 );
+      pin_->setOffsetY( (offsetLy + offsetUy) / 2 );
+    }
+
+    void setOrient    (Orient orient) { orient_   = orient;   }
+    void setFixed     (bool  isFixed) { isFixed_  = isFixed;  }
+    // These are written in DEF PINS
+    
+    void setPin       (dbPin* pin   ) { pin_      = pin;      }
+
+  private:
+
+    int id_;
+
+    int origX_;
+    int origY_;
+
+    int offsetLx_;
+    int offsetLy_;
+    int offsetUx_;
+    int offsetUy_;
+
+    bool isFixed_;
+
+    Orient       orient_;
+    PinDirection direction_;
+    std::string  ioName_;
+
+    dbPin* pin_;
+};
+
 
 class dbCell
 {
@@ -446,6 +556,7 @@ class LefDefParser
 
     // Getters
     std::vector<dbCell*> cells() const { return dbCellPtrs_; }                 // List of DEF COMPONENTS
+    std::vector<dbIO*>     ios() const { return dbIOPtrs_;   }                 // List of DEF PINS 
     std::vector<dbPin*>   pins() const { return dbPinPtrs_;  }                 // List of Internal + External Pins
     std::vector<dbNet*>   nets() const { return dbNetPtrs_;  }                 // List of Nets
     std::vector<dbRow*>   rows() const { return dbRowPtrs_;  }                 // List of DEF ROWS
@@ -491,6 +602,7 @@ class LefDefParser
 
     int numPI_;                                                                // Number of PI (Primary Input )
     int numPO_;                                                                // Number of PO (Primary Output)
+    int numIO_;                                                                // Number of IO (PI + PO)
     int numInst_;                                                              // Number of Instances
     int numNet_;                                                               // Number of Nets
     int numPin_;                                                               // Number of Pins
@@ -506,16 +618,20 @@ class LefDefParser
     std::vector<dbPin*>  dbPinPtrs_;
     std::vector<dbPin>   dbPinInsts_;
 
+    std::vector<dbIO*>   dbIOPtrs_;
+    std::vector<dbIO>    dbIOInsts_;
+
     std::vector<dbNet*>  dbNetPtrs_;
     std::vector<dbNet>   dbNetInsts_;
 
     std::unordered_map<std::string, int> strToCellID_;
     std::unordered_map<std::string, int> strToNetID_;
     std::unordered_map<std::string, int> strToPinID_;
+    std::unordered_map<std::string, int> strToIOID_;
 
     // DEF-related
     int numRow_;
-    int numDefComponents_;
+    int numDefComps_;
 
     dbDie die_;
 
