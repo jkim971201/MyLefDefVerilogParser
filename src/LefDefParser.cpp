@@ -537,7 +537,7 @@ LefDefParser::readLefUnit(strIter& itr, const strIter& end)
 void 
 LefDefParser::readLef(const std::filesystem::path& fileName)
 {
-  std::cout << "readLef     : " << fileName << std::endl;
+  std::cout << "Read " << std::string(fileName) << std::endl;
 
   static std::string_view delimiters = "#;";
   static std::string_view exceptions = "";
@@ -589,7 +589,7 @@ LefDefParser::printLefStatistic() const
 void
 LefDefParser::readVerilog(const std::filesystem::path& path)
 {
-  std::cout << "readVerilog : " << path << std::endl;
+  std::cout << "Read " << std::string(path) << std::endl;
 
 	if(!ifReadLef_)
 	{
@@ -703,7 +703,7 @@ LefDefParser::readVerilog(const std::filesystem::path& path)
         if(numNet_ % 200000 == 0)
         {
           using namespace std;
-          cout << "Read ";
+          cout << "  Read ";
           cout << setw(7) << right << numNet_ << " Nets..." << endl;
         }
       }
@@ -776,7 +776,7 @@ LefDefParser::readVerilog(const std::filesystem::path& path)
       if(numInst_ % 200000 == 0)
       {
         using namespace std;
-        cout << "Read ";
+        cout << "  Read ";
         cout << setw(7) << right << numInst_ << " Instances..." << endl;
       }
     }
@@ -1028,7 +1028,7 @@ LefDefParser::readDefOneComponent(strIter& itr, const strIter& end)
   if(numDefComps_ % 200000 == 0)
   {
     using namespace std;
-    cout << "Read " << setw(7) << numDefComps_ << " Components..." << endl;
+    cout << "  Read " << setw(7) << numDefComps_ << " Components..." << endl;
   }
 }
 
@@ -1172,7 +1172,7 @@ LefDefParser::readDefPins(strIter& itr, const strIter& end)
 void 
 LefDefParser::readDef(const std::filesystem::path& fileName)
 {
-  std::cout << "readDef     : " << fileName << std::endl;
+  std::cout << "Read " << std::string(fileName) << std::endl;
 
 	if(!ifReadLef_)
 	{
@@ -1259,6 +1259,14 @@ LefDefParser::readDef(const std::filesystem::path& fileName)
 			sumStdCellArea_ += area;
 	}
 
+	int64_t coreArea = die_.coreArea();
+
+	util_    = static_cast<float>( sumTotalInstArea_) 
+		       / static_cast<float>( coreArea );
+
+	density_ = static_cast<float>( sumStdCellArea_ )
+			     / static_cast<float>( coreArea - sumMacroArea_ );
+
 	ifReadDef_ = true;
 
 //  std::cout << "=================================="  << std::endl;
@@ -1287,31 +1295,40 @@ LefDefParser::printInfo()
 	using namespace std;
 	cout << endl;
 	cout << "*** Summary of Information ***" << endl;
-	cout << "------------------------------------------" << endl;
+	cout << "---------------------------------------------" << endl;
 	cout << " TECHNOLOGY INFO"                           << endl;
-	cout << "------------------------------------------" << endl;
-	cout << " NUM LEF MACROS : " << macros_.size() << endl;
-	cout << " NUM LEF SITE   : " << sites_.size()  << endl;
-	cout << " DATABASE UNIT  : " << dbUnit_ << endl;
-	cout << "------------------------------------------" << endl;
+	cout << "---------------------------------------------" << endl;
+	cout << " NUM LEF MACRO    : " << macros_.size() << endl;
+	cout << " NUM LEF SITE     : " << sites_.size()  << endl;
+	cout << " DATABASE UNIT    : " << dbUnit_ << endl;
+	cout << "---------------------------------------------" << endl;
 	cout << " DESIGN INFO"                               << endl;
-	cout << "------------------------------------------" << endl;
-	cout << " DESIGN NAME    : " << designName_ << endl;
-	cout << " NUM PI         : " << numPI_      << endl;
-	cout << " NUM PO         : " << numPO_      << endl;
-	cout << " NUM INSTANCE   : " << numInst_    << endl;
-	cout << " NUM MACRO      : " << numMacro_   << endl;
-	cout << " NUM STD CELL   : " << numStdCell_ << endl;
-	cout << " NUM NET        : " << numNet_     << endl;
-	cout << " NUM PIN        : " << numPin_     << endl;
-	cout << " NUM DUMMY      : " << numDummy_   << endl;
-	cout << " DIE  ( " << setw(8) << dieLx  << " ";
-	cout << setw(8) << dieLy  << " ) ( ";
+	cout << "---------------------------------------------" << endl;
+	cout << " DESIGN NAME      : " << designName_ << endl;
+	cout << " NUM PI           : " << numPI_      << endl;
+	cout << " NUM PO           : " << numPO_      << endl;
+	cout << " NUM IO           : " << numIO_      << endl;
+	cout << " NUM INSTANCE     : " << numInst_    << endl;
+	cout << " NUM MACRO        : " << numMacro_   << endl;
+	cout << " NUM STD CELL     : " << numStdCell_ << endl;
+	cout << " NUM NET          : " << numNet_     << endl;
+	cout << " NUM PIN          : " << numPin_     << endl;
+	cout << " NUM DUMMY        : " << numDummy_   << endl;
+	cout << " NUM ROW          : " << numRow_     << endl;
+	cout << " UTIL             : " << fixed << setprecision(2) << util_    * 100 << "%\n";
+	cout << " DENSITIY         : " << fixed << setprecision(2) << density_ * 100 << "%\n";
+	cout << " AREA (INSTANACE) : " << setw(16) << sumTotalInstArea_ << endl;
+	cout << " AREA (STD CELL)  : " << setw(16) << sumStdCellArea_   << endl;
+	cout << " AREA (MACRO)     : " << setw(16) << sumMacroArea_     << endl;
+	cout << " AREA (DIE)       : " << setw(16) << die_.area()       << endl;
+	cout << " AREA (CORE)      : " << setw(16) << die_.coreArea()   << endl;
+	cout << " DIE  ( " << setw(5) << dieLx  << " ";
+	cout << setw(5) << dieLy  << " ) ( ";
 	cout << setw(8) << dieUx  << " " << dieUy  << " )\n";
-	cout << " CORE ( " << setw(8) << coreLx << " ";
-	cout << setw(8) << coreLy << " ) ( ";
+	cout << " CORE ( " << setw(5) << coreLx << " ";
+	cout << setw(5) << coreLy << " ) ( ";
 	cout << setw(8) << coreUx << " " << coreUy << " )\n";
-	cout << "------------------------------------------" << endl;
+	cout << "---------------------------------------------" << endl;
 }
 
 };

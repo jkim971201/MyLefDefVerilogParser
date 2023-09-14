@@ -450,7 +450,8 @@ class dbCell
     int               uy()  const { return ly_ + dy_;   }
     int               dx()  const { return dx_;         }
     int               dy()  const { return dy_;         }
-		int             area()  const { return dx_ * dy_;   }
+		int64_t         area()  const { return static_cast<int64_t>(dx_) 
+			                                   * static_cast<int64_t>(dy_); }
 
     LefMacro*   lefMacro()  const { return lefMacro_;   }
     bool         isFixed()  const { return isFixed_;    }
@@ -584,6 +585,9 @@ class dbDie
 
 		int64_t area() const { return static_cast<int64_t>(ux_ - lx_)
 			                          * static_cast<int64_t>(uy_ - ly_); }
+		
+		int64_t coreArea() const { return static_cast<int64_t>(coreUx_ - coreLx_)
+			                              * static_cast<int64_t>(coreUy_ - coreLy_); }
 
   private:
 
