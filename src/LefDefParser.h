@@ -12,11 +12,11 @@ namespace LefDefDB
 // For Parsing LEF
 typedef std::vector<std::string>::iterator strIter;
 
-enum MacroClass    {CORE, CORE_SPACER, PAD, BLOCK, ENDCAP};
-enum SiteClass     {CORE_SITE};
-enum PinDirection  {INPUT, OUTPUT, INOUT};
-enum PinUsage      {SIGNAL, POWER};
-enum CellOrient    {N, S, FN, FS};  // W E FW FE is not supported
+enum MacroClass   {CORE, CORE_SPACER, PAD, BLOCK, ENDCAP};
+enum SiteClass    {CORE_SITE};
+enum PinDirection {INPUT, OUTPUT, INOUT};
+enum PinUsage     {SIGNAL, POWER};
+enum Orient       {N, S, FN, FS};  // W E FW FE is not supported
 
 struct LefRect
 {
@@ -55,26 +55,34 @@ class LefPin
     void addLefRect(LefRect rect) { lefRect_.push_back(rect); }
 
     // Getters
-    LefMacro* macro() const { return lefMacro_; }
+		float                 lx() const { return lx_;         }
+		float                 ly() const { return ly_;         }
+		float                 ux() const { return ux_;         }
+		float                 uy() const { return uy_;         }
 
-    std::string name() const { return pinName_; }
-
-    PinUsage     usage()     const { return pinUsage_; }
-    PinDirection direction() const { return pinDir_;   }
+    LefMacro*          macro() const { return lefMacro_;   }
+    std::string         name() const { return pinName_;    }
+    PinUsage           usage() const { return pinUsage_;   }
+    PinDirection   direction() const { return pinDir_;     }
 
     const std::vector<LefRect>& lefRect() const { return lefRect_; }
 
-    std::pair<float, float> getPinCoordi() const;
+    void computeBBox();
 
   private:
 
     LefMacro* lefMacro_;
 
-    std::string   pinName_;
-    PinUsage      pinUsage_;
-    PinDirection  pinDir_;
+    std::string  pinName_;
+    PinUsage     pinUsage_;
+    PinDirection pinDir_;
 
     std::vector<LefRect> lefRect_;
+
+		float lx_;
+		float ly_;
+		float ux_;
+		float uy_;
 };
 
 class LefSite
@@ -202,17 +210,16 @@ class dbPin
           int netID,
           bool isPI,
           bool isPO,
-          std::string&  pinName,
-          const LefPin* lefPin)
+          std::string&  pinName)
       : id_        (pinID    ),
         nid_       (netID    ),
         pinName_   (pinName  ),
-        lefPin_    (lefPin   ),
-				isPI_      (isPI     ),
-				isPO_      (isPO     )
+        isPI_      (isPI     ),
+        isPO_      (isPO     )
     {
       cid_        = INT_MAX;
       isExternal_ = true;
+      lefPin_     = nullptr;
     }
 
     // for internal pins
@@ -231,6 +238,9 @@ class dbPin
       isExternal_ = false;
       isPI_       = false;
       isPO_       = false;
+	
+			cx_ = ( lefPin->lx() + lefPin->ly() ) / 2.0;
+			cy_ = ( lefPin->ux() + lefPin->uy() ) / 2.0;
     }
 
     // Setters
@@ -242,6 +252,11 @@ class dbPin
     int              cid() const { return cid_;            }
     int              nid() const { return nid_;            }
 
+    int            sizeX() const { return sizeX_;          }
+    int            sizeY() const { return sizeY_;          }
+    int               cx() const { return cx_;             }
+    int               cy() const { return cy_;             }
+
     std::string  pinName() const { return pinName_;        }
     std::string portName() const { return lefPin_->name(); }
 
@@ -249,6 +264,10 @@ class dbPin
     dbNet*           net() const { return dbNet_;          }
 
     const LefPin* lefPin() const { return lefPin_;         }
+
+    bool      isExternal() const { return isExternal_;     }
+    bool            isPI() const { return isPI_;           }
+    bool            isPO() const { return isPO_;           }
 
   private:
 
@@ -259,6 +278,9 @@ class dbPin
     // Size in dbu
     int sizeX_;
     int sizeY_;
+
+		int cx_;
+		int cy_;
 
     std::string pinName_;
 
@@ -283,13 +305,13 @@ class dbCell
     {}
 
     // Setters
-    void setName       (std::string& name     ) { cellName_   = name;       }
-    void setLefMacro   (LefMacro* lefMacro    ) { lefMacro_   = lefMacro;   }
-    void setCellOrient (CellOrient cellOrient ) { cellOrient_ = cellOrient; }
-    void setFixed      (bool isFixed          ) { isFixed_    = isFixed;    }
-    void setLx         (int lx                ) { lx_         = lx;         }
-    void setLy         (int ly                ) { ly_         = ly;         }
-    void addPin        (dbPin* pin            ) { pins_.push_back(pin);     }
+    void setName       (std::string& name   ) { cellName_   = name;       }
+    void setLefMacro   (LefMacro* lefMacro  ) { lefMacro_   = lefMacro;   }
+    void setOrient     (Orient cellOrient   ) { cellOrient_ = cellOrient; }
+    void setFixed      (bool isFixed        ) { isFixed_    = isFixed;    }
+    void setLx         (int lx              ) { lx_         = lx;         }
+    void setLy         (int ly              ) { ly_         = ly;         }
+    void addPin        (dbPin* pin          ) { pins_.push_back(pin);     }
 
     // Getters
     std::string     name()  const { return cellName_;   }
@@ -298,7 +320,7 @@ class dbCell
     int               ly()  const { return ly_;         }
     LefMacro*   lefMacro()  const { return lefMacro_;   }
     bool         isFixed()  const { return isFixed_;    }
-    CellOrient    orient()  const { return cellOrient_; }
+    Orient        orient()  const { return cellOrient_; }
 
     const std::vector<dbPin*>& pins() const { return pins_; }
 
@@ -312,7 +334,7 @@ class dbCell
 
     bool isFixed_;
 
-    CellOrient cellOrient_;
+    Orient cellOrient_;
 
     std::vector<dbPin*> pins_;
 
@@ -457,11 +479,11 @@ class LefDefParser
 
     void printLefStatistic() const;                                            // Print LEF Statistic (for debugging)
 
-    std::unordered_map<std::string, MacroClass>   strToMacroClass_;            // String - enum MACRO     CLASS     Table
-    std::unordered_map<std::string, SiteClass>    strToSiteClass_;             // String - enum SITE      CLASS     Table
-    std::unordered_map<std::string, PinDirection> strToPinDirection_;          // String - enum PIN       DIRECTION Table
-    std::unordered_map<std::string, PinUsage>     strToPinUsage_;              // String - enum PIN       USAGE     Table
-    std::unordered_map<std::string, CellOrient>   strToCellOrient_;            // String - enum COMPONENT ORIENT    Table
+    std::unordered_map<std::string, MacroClass>   strToMacroClass_;            // String - enum MACRO_CLASS   Table
+    std::unordered_map<std::string, SiteClass>    strToSiteClass_;             // String - enum SITE_CLASS    Table
+    std::unordered_map<std::string, PinDirection> strToPinDirection_;          // String - enum PIN_DIRECTION Table
+    std::unordered_map<std::string, PinUsage>     strToPinUsage_;              // String - enum PIN_USAGE     Table
+    std::unordered_map<std::string, Orient>       strToOrient_;                // String - enum ORIENT        Table
 
 
     // Verilog-related
@@ -489,10 +511,11 @@ class LefDefParser
 
     std::unordered_map<std::string, int> strToCellID_;
     std::unordered_map<std::string, int> strToNetID_;
+    std::unordered_map<std::string, int> strToPinID_;
 
     // DEF-related
     int numRow_;
-		int numDefComponents_;
+    int numDefComponents_;
 
     dbDie die_;
 

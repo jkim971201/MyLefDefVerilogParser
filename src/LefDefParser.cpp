@@ -12,11 +12,10 @@
 namespace LefDefDB
 {
 
-// Function: on_next_parentheses
 // Iteratively apply closure c on each token inside the parentheses pair
 // I : Iterator C: Closure 
 template <typename I, typename C>
-auto on_next_parentheses(const I start, const I end, C&& c) 
+auto findParenthesePair(const I start, const I end, C&& c) 
 {
   auto left  = std::find(start, end, "(");
   auto right = left;
@@ -44,6 +43,21 @@ auto on_next_parentheses(const I start, const I end, C&& c)
   return right;
 }
 
+// K-Key, M-Map, V-Value
+template <typename K, typename M, typename V>
+void checkIfKeyExist(K key, M& map, V& value, const std::string keyType)
+{
+  auto checkKey = map.find(key);
+
+  if(checkKey == map.end())
+  {
+    std::cout << "Error " + keyType + " ";
+    std::cout << key << " is missing in DB." << std::endl;
+    exit(0);
+  }
+  else
+    value = checkKey->second;
+}
 
 // LEF-related
 void 
@@ -73,8 +87,8 @@ LefMacro::printInfo() const
   cout << "----------------------------------------" << endl;
 }
 
-std::pair<float, float>
-LefPin::getPinCoordi() const
+void
+LefPin::computeBBox()
 {
   float minX = FLT_MAX;
   float minY = FLT_MAX;
@@ -98,10 +112,10 @@ LefPin::getPinCoordi() const
       maxY = uy;
   }
 
-  float cX = (minX + maxX) / 2.0;
-  float cY = (minY + maxY) / 2.0;
-
-  return std::pair<float, float>(cX, cY);
+	lx_ = minX;
+	ly_ = minY;
+	ux_ = maxX;
+	uy_ = maxY;
 }
 
 std::vector<std::string>
@@ -210,14 +224,15 @@ LefDefParser::tokenize(const std::filesystem::path& path,
 }
 
 LefDefParser::LefDefParser()
-  : numPI_             (0),
-    numPO_             (0),
-    numInst_           (0),
-    numNet_            (0),
-    numPin_            (0),
-    numRow_            (0),
-    numDummy_          (0),
-		numDefComponents_  (0)
+  : numPI_             (   0),
+    numPO_             (   0),
+    numInst_           (   0),
+    numNet_            (   0),
+    numPin_            (   0),
+    numRow_            (   0),
+    numDummy_          (   0),
+    numDefComponents_  (   0),
+    dbUnit_            (1000)
 {
   strToMacroClass_["CORE"       ] = MacroClass::CORE;
   strToMacroClass_["CORE_SPACER"] = MacroClass::CORE_SPACER;
@@ -234,10 +249,10 @@ LefDefParser::LefDefParser()
   strToPinUsage_["SIGNAL"] = PinUsage::SIGNAL;
   strToPinUsage_["POWER" ] = PinUsage::POWER;
 
-  strToCellOrient_["N" ] = CellOrient::N;
-  strToCellOrient_["S" ] = CellOrient::S;
-  strToCellOrient_["FN"] = CellOrient::FN;
-  strToCellOrient_["FS"] = CellOrient::FS;
+  strToOrient_["N" ] = Orient::N;
+  strToOrient_["S" ] = Orient::S;
+  strToOrient_["FN"] = Orient::FN;
+  strToOrient_["FS"] = Orient::FS;
 }
 
 void 
@@ -305,32 +320,33 @@ LefDefParser::readLefPin(strIter& itr, const strIter& end, LefMacro* lefMacro)
       break;
   }
 
-	PinUsage     pUsage;
-	PinDirection pDirection;
+  PinUsage     pUsage;
+  PinDirection pDirection;
 
-	auto pinUsageCheck      = strToPinUsage_.find(pinUsage);
-	auto pinDirectionCheck  = strToPinDirection_.find(pinDirection);
+  auto pinUsageCheck      = strToPinUsage_.find(pinUsage);
+  auto pinDirectionCheck  = strToPinDirection_.find(pinDirection);
 
-	if(pinUsageCheck == strToPinUsage_.end())
-	{
-		std::cout << "Error - PIN USAGE " << pinUsage;
-		std::cout << " is not supported yet." << std::endl;
-		exit(0);
-	}
-	else
-		pUsage = pinUsageCheck->second;
+  if(pinUsageCheck == strToPinUsage_.end())
+  {
+    std::cout << "Error - PIN USAGE " << pinUsage;
+    std::cout << " is not supported yet." << std::endl;
+    exit(0);
+  }
+  else
+    pUsage = pinUsageCheck->second;
 
-	if(pinDirectionCheck == strToPinDirection_.end())
-	{
-		std::cout << "Error - PIN DIRECTION " << pDirection;
-		std::cout << " is not supported yet." << std::endl;
-		exit(0);
-	}
-	else
-		pDirection = pinDirectionCheck->second;
+  if(pinDirectionCheck == strToPinDirection_.end())
+  {
+    std::cout << "Error - PIN DIRECTION " << pDirection;
+    std::cout << " is not supported yet." << std::endl;
+    exit(0);
+  }
+  else
+    pDirection = pinDirectionCheck->second;
 
   lefPin.setPinUsage( pUsage );
   lefPin.setPinDirection( pDirection );
+	lefPin.computeBBox();
 
   lefMacro->addPin(lefPin);
 
@@ -385,32 +401,32 @@ LefDefParser::readLefMacro(strIter& itr, const strIter& end)
       break;
   }
 
-	MacroClass mcClass;
-	LefSite* lefSite;
+  MacroClass mcClass;
+  LefSite* lefSite;
 
-	auto classCheck = strToMacroClass_.find(macroClass);
-	auto siteCheck  = siteMap_.find(siteName);
+  auto classCheck = strToMacroClass_.find(macroClass);
+  auto siteCheck  = siteMap_.find(siteName);
 
-	if(classCheck == strToMacroClass_.end())
-	{
-		std::cout << "Error - CLASS " << macroClass;
-		std::cout << " is not supported yet." << std::endl;
-		exit(0);
-	}
-	else
-		mcClass = classCheck->second;
-	
-	if(siteCheck == siteMap_.end())
-	{
-		if(macroClass != "BLOCK") // BLOCK MACRO does not have SITE
-		{
-			std::cout << "Error - SITE " << siteName;
-			std::cout << " is not found in the LEF." << std::endl;
-			exit(0);
-		}
-	}
-	else
-		lefSite = siteCheck->second;
+  if(classCheck == strToMacroClass_.end())
+  {
+    std::cout << "Error - CLASS " << macroClass;
+    std::cout << " is not supported yet." << std::endl;
+    exit(0);
+  }
+  else
+    mcClass = classCheck->second;
+  
+  if(siteCheck == siteMap_.end())
+  {
+    if(macroClass != "BLOCK") // BLOCK MACRO does not have SITE
+    {
+      std::cout << "Error - SITE " << siteName;
+      std::cout << " is not found in the LEF." << std::endl;
+      exit(0);
+    }
+  }
+  else
+    lefSite = siteCheck->second;
 
   lefMacro.setClass( mcClass );
   lefMacro.setSite ( lefSite );
@@ -459,17 +475,17 @@ LefDefParser::readLefSite(strIter& itr, const strIter& end)
       break;
   }
 
-	SiteClass sClass;
-	auto siteClassCheck = strToSiteClass_.find(siteClass);
+  SiteClass sClass;
+  auto siteClassCheck = strToSiteClass_.find(siteClass);
 
-	if(siteClassCheck == strToSiteClass_.end())
-	{
-		std::cout << "Error - SITE CLASS " << siteClass;
-		std::cout << " is not supported yet." << std::endl;
-		exit(0);
-	}
-	else
-		sClass = siteClassCheck->second;
+  if(siteClassCheck == strToSiteClass_.end())
+  {
+    std::cout << "Error - SITE CLASS " << siteClass;
+    std::cout << " is not supported yet." << std::endl;
+    exit(0);
+  }
+  else
+    sClass = siteClassCheck->second;
 
   LefSite lefSite(siteName, sClass, sizeX, sizeY);
 
@@ -602,19 +618,46 @@ LefDefParser::readVerilog(const std::filesystem::path& path)
   {
     if(*itr == "endmodule") 
       break;
-    else if(*itr == "input") 
+    else if(*itr == "input" | *itr == "output") 
     {
+      bool isPI = false;
+      bool isPO = false;
+
+      if(*itr == "input")
+        isPI = true;
+      else
+        isPO = true;
+
       while(++itr != end && *itr != ";") 
-			{
-        numPI_++;
-			}
-    }
-    else if(*itr == "output") 
-    {
-      while(++itr != end && *itr != ";") 
-			{
-        numPO_++;
-			}
+      {
+        std::string pinName = std::move( *(itr) );
+        std::string netName = pinName;
+
+        int pinID = numPin_;
+        int netID = numNet_;
+
+        dbPin pinPI(pinID, 
+                    netID, 
+                    isPI, 
+                    isPO,
+                    pinName);
+
+        dbNet netPI(netID, netName);
+
+        dbPinInsts_.push_back(pinPI);
+        dbNetInsts_.push_back(netPI);
+
+        strToPinID_[pinName] = pinID;
+        strToNetID_[netName] = netID;
+
+        numPin_++;
+        numNet_++;
+
+        if(isPI)
+          numPI_++;
+        else
+          numPO_++;
+      }
     }
     else if(*itr == "wire") 
     {
@@ -628,24 +671,22 @@ LefDefParser::readVerilog(const std::filesystem::path& path)
         strToNetID_[netName] = netID;
 
         numNet_++;
+
+        if(numNet_ % 200000 == 0)
+        {
+          using namespace std;
+          cout << "Read ";
+          cout << setw(7) << right << numNet_ << " Nets..." << endl;
+        }
       }
     }
     else 
     {
       std::string macroName = std::move(*itr);
 
-      auto checkMacro = macroMap_.find(macroName);
-
       LefMacro* lefMacro;
 
-      if(checkMacro == macroMap_.end() )
-      {
-        std::cout << "Error - Macro " << macroName << " ";
-        std::cout << "is not found in the LEF." << std::endl;
-        exit(0);
-      }
-      else
-        lefMacro = checkMacro->second;
+      checkIfKeyExist(macroName, macroMap_, lefMacro, "MACRO");
 
       if(++itr == end) 
       {
@@ -664,21 +705,25 @@ LefDefParser::readVerilog(const std::filesystem::path& path)
       std::string portName;
       std::string netName;
 
-      itr = on_next_parentheses(itr, end, [&] (auto& str) mutable { 
+      itr = findParenthesePair(itr, end, [&] (auto& str) mutable { 
         if(str == ")" || str == "(") 
           return;
         else if(str[0] == '.') 
           portName = std::move( str.substr(1) );
         else 
         {
-          netName   = std::move( str );
-          int netID = strToNetID_[netName];
+          int netID;
+          netName = std::move( str );
+          checkIfKeyExist(netName, strToNetID_, netID, "Net");
+
           int pinID = numPin_;
 
           std::string pinName = portName + ":" + cellName;
           dbPin pin(pinID, cellID, netID, pinName, lefMacro->getPin(portName));
 
           dbPinInsts_.push_back(pin);
+
+          strToPinID_[pinName] = pinID;
           numPin_++;
         }
       });
@@ -719,14 +764,16 @@ LefDefParser::readVerilog(const std::filesystem::path& path)
     int cellID = pin.cid();
     int netID  = pin.nid();
 
-    dbCell* cellPtr = &( dbCellInsts_[cellID] );
     dbNet*  netPtr  = &( dbNetInsts_[netID]   );
-
-    cellPtr->addPin(&pin);
     netPtr->addPin(&pin);
-
-    pin.setCell( cellPtr ); 
     pin.setNet( netPtr );
+
+    if( !pin.isExternal() )
+    {
+      dbCell* cellPtr = &( dbCellInsts_[cellID] );
+      cellPtr->addPin(&pin);
+      pin.setCell( cellPtr ); 
+    }
 
     dbPinPtrs_.push_back(&pin);
   }
@@ -782,18 +829,9 @@ LefDefParser::readDefRow(strIter& itr, const strIter& end)
 
   stepY = std::stoi( *(++itr) );
 
-  auto checkSite = siteMap_.find(siteName);
-
   LefSite* lefSite;
 
-  if(checkSite == siteMap_.end() )
-  {
-    std::cout << "Error - Site " << siteName;
-    std::cout << " is not found in the LEF." << std::endl;
-    exit(0);
-  }
-  else
-    lefSite = checkSite->second;
+  checkIfKeyExist(siteName, siteMap_, lefSite, "LEF SITE");
 
   dbRow row(rowName, lefSite, 
             dbUnit_,
@@ -847,15 +885,12 @@ LefDefParser::readDefOneComponent(strIter& itr, const strIter& end)
 
   std::string cellStatus;
 
-  LefMacro* lefMacro;
-
   int coordiX = 0;
   int coordiY = 0;
 
   std::string cellOrient;
 
-  instName = std::move( *(++itr) );
-
+  instName  = std::move( *(++itr) );
   macroName = std::move( *(++itr) );
 
   assert( *(++itr) == "+" );
@@ -865,30 +900,24 @@ LefDefParser::readDefOneComponent(strIter& itr, const strIter& end)
   assert( *(++itr) == "(" );
 
   coordiX = std::stoi( *(++itr));
-
   coordiY = std::stoi( *(++itr));
 
   assert( *(++itr) == ")" );
 
   cellOrient = std::move( *(++itr) );
 
-  int cellID;
-  auto checkCell  = strToCellID_.find(instName);
-  auto checkMacro = macroMap_.find(macroName);
-
   bool isFixed = (cellStatus == "FIXED") ? true : false;
 
-  if(checkMacro == macroMap_.end() )
-  {
-    std::cout << "Error - Macro " << macroName << " ";
-    std::cout << "is not found in the LEF." << std::endl;
-    exit(0);
-  }
-  else
-    lefMacro = checkMacro->second;
+  int cellID;
+  auto checkCell = strToCellID_.find(instName);
+
+  LefMacro* lefMacro;
+  checkIfKeyExist(macroName, macroMap_, lefMacro, "MACRO");
 
   dbCell* cell;
 
+  // Even if instanceName is not in the map,
+  // it does not mean an error...
   if(checkCell == strToCellID_.end())
   {
     // These components do not exist in the Verilog file
@@ -911,37 +940,38 @@ LefDefParser::readDefOneComponent(strIter& itr, const strIter& end)
     cell   = dbCellPtrs_[cellID];
   }
 
+  Orient orient;
+  auto orientCheck = strToOrient_.find(cellOrient);
 
-	CellOrient orient;
-	auto orientCheck = strToCellOrient_.find(cellOrient);
+  checkIfKeyExist(cellOrient, strToOrient_, orient, "COMPONENT ORIENT");
 
-	if(orientCheck == strToCellOrient_.end())
-	{
-		std::cout << "Error - ORIENT " << cellOrient;
-		std::cout << " is not supported yet." << std::endl;
-		exit(0);
-	}
-	else
-		orient = orientCheck->second;
+  if(orientCheck == strToOrient_.end())
+  {
+    std::cout << "Error - ORIENT " << cellOrient;
+    std::cout << " is not supported yet." << std::endl;
+    exit(0);
+  }
+  else
+    orient = orientCheck->second;
 
-  cell->setCellOrient(orient);
+  cell->setOrient(orient);
 
   cell->setLx(coordiX);
   cell->setLy(coordiY);
 
-	numDefComponents_++;
+  numDefComponents_++;
 
-	if(numDefComponents_ % 200000 == 0)
-	{
-		using namespace std;
-		cout << "Read " << setw(7) << numDefComponents_ << " Components..." << endl;
-	}
+  if(numDefComponents_ % 200000 == 0)
+  {
+    using namespace std;
+    cout << "Read " << setw(7) << numDefComponents_ << " Components..." << endl;
+  }
 }
 
 void
 LefDefParser::readDefComponents(strIter& itr, const strIter& end)
 {
-	int defComponents = std::stoi( std::move( *(++itr) ) );
+  int defComponents = std::stoi( std::move( *(++itr) ) );
 
   while(++itr != end)
   {
@@ -952,6 +982,116 @@ LefDefParser::readDefComponents(strIter& itr, const strIter& end)
     else
     {
       std::cout << "Syntax Error while Reading DEF COMPONENTS" << std::endl;
+      exit(0);
+    }
+  }
+}
+
+void 
+LefDefParser::readDefOnePin(strIter& itr, const strIter& end)
+{
+  std::string pinName;
+  std::string netName;
+
+  std::string pinStatus;
+  std::string pinDirection;
+  std::string pinOrient;
+  std::string pinLayer;
+
+  int offsetLx = 0;
+  int offsetLy = 0;
+
+  int offsetUx = 0;
+  int offsetUy = 0;
+
+  int originX = 0;
+  int originY = 0;
+
+  pinName = std::move( *(++itr) );
+
+  assert( *(++itr) == "+" );
+
+  assert( *(++itr) == "NET" );
+
+  netName = std::move( *(++itr) );
+
+  while( *(itr + 1) != "END" && *(itr + 1) != "-" ) 
+  {
+    if( *itr == "DIRECTION" )
+      pinDirection = std::move( *(++itr) );
+
+    else if( *itr == "FIXED" || *itr == "PLACED" )
+    {
+      pinStatus = std::move( *(itr) );
+
+      assert(*(++itr) == "(");
+
+      originX = std::stoi( *(++itr) );
+
+      originY = std::stoi( *(++itr) );
+
+      assert(*(++itr) == ")");
+
+      pinOrient = std::move( *(++itr) );
+    }
+
+    else if( *itr == "LAYER" )
+    {
+      pinLayer = std::move( *(++itr) );
+
+      assert(*(++itr) == "(");
+
+      offsetLx = std::stoi( *(++itr) );
+
+      offsetLy = std::stoi( *(++itr) );
+
+      assert(*(++itr) == ")");
+
+      assert(*(++itr) == "(");
+
+      offsetUx = std::stoi( *(++itr) );
+
+      offsetUy = std::stoi( *(++itr) );
+
+      assert(*(++itr) == ")");
+    }
+    else
+      itr++;
+  }
+
+  std::cout << "PinName : " << pinName;
+
+  std::cout << " NetName : " << netName;
+
+  std::cout << " PinStatus : " << pinStatus << std::endl;
+
+  int pinID;
+
+  checkIfKeyExist(pinName, strToPinID_, pinID, "PIN");
+
+  dbPin* pin = dbPinPtrs_[pinID];
+
+	//std::cout << "NetName in Verilog : " << pin->net()->name() << std::endl;
+	//std::cout << "NetName in DEF     : " << netName << std::endl;
+
+  assert(pin->net()->name() == netName);
+}
+
+void
+LefDefParser::readDefPins(strIter& itr, const strIter& end)
+{
+	int numDefPins = std::stoi( *(++itr) );
+
+  while(++itr != end)
+  {
+    if(*itr == "-")
+      readDefOnePin(itr, end);
+    else if(*itr == "END" && *(++itr) == "PINS")
+      break;
+    else
+    {
+      std::cout << "Syntax Error while Reading DEF PINS" << std::endl;
+      std::cout << *(itr) << std::endl;
       exit(0);
     }
   }
@@ -987,8 +1127,8 @@ LefDefParser::readDef(const std::filesystem::path& fileName)
       readDefRow(itr, end);
     else if(*itr == "COMPONENTS")
       readDefComponents(itr, end);
-//    else if(*itr == "PINS")
-//      readDefPins(itr, end, numPin);
+    else if(*itr == "PINS")
+      readDefPins(itr, end);
     else if(*itr == "END" && *(itr + 1) == "DESIGN")
       break;
   }
