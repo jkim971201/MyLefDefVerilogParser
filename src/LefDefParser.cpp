@@ -224,16 +224,24 @@ LefDefParser::tokenize(const std::filesystem::path& path,
 }
 
 LefDefParser::LefDefParser()
-  : numPI_             (   0),
-    numPO_             (   0),
-    numIO_             (   0),
-    numInst_           (   0),
-    numNet_            (   0),
-    numPin_            (   0),
-    numRow_            (   0),
-    numDummy_          (   0),
-    numDefComps_       (   0),
-    dbUnit_            (1000)
+  : numPI_             (    0),
+    numPO_             (    0),
+    numIO_             (    0),
+    numInst_           (    0),
+    numNet_            (    0),
+    numPin_            (    0),
+    numRow_            (    0),
+    numStdCell_        (    0),
+    numDummy_          (    0),
+    numMacro_          (    0),
+    numDefComps_       (    0),
+    dbUnit_            ( 1000),
+		sumTotalInstArea_  (    0),
+		sumStdCellArea_    (    0),
+		sumMacroArea_      (    0),
+		ifReadLef_         (false),
+		ifReadVerilog_     (false),
+		ifReadDef_         (false)
 {
   strToMacroClass_["CORE"       ] = MacroClass::CORE;
   strToMacroClass_["CORE_SPACER"] = MacroClass::CORE_SPACER;
@@ -492,7 +500,9 @@ LefDefParser::readLefSite(strIter& itr, const strIter& end)
 
   sites_.push_back(lefSite);
 
-  siteMap_[siteName] = &(*sites_.end());
+	int numSites = sites_.size();
+
+  siteMap_[siteName] = &(sites_[numSites - 1]);
 
   if(itr == end)
   {
@@ -527,7 +537,7 @@ LefDefParser::readLefUnit(strIter& itr, const strIter& end)
 void 
 LefDefParser::readLef(const std::filesystem::path& fileName)
 {
-  std::cout << "readLef : " << fileName << std::endl;
+  std::cout << "readLef     : " << fileName << std::endl;
 
   static std::string_view delimiters = "#;";
   static std::string_view exceptions = "";
@@ -552,7 +562,9 @@ LefDefParser::readLef(const std::filesystem::path& fileName)
   for(auto& macro : macros_)
     macroMap_[macro.name()] = &macro;
 
-  printLefStatistic();
+	ifReadLef_ = true;
+
+  // printLefStatistic();
 }
 
 void 
@@ -578,6 +590,12 @@ void
 LefDefParser::readVerilog(const std::filesystem::path& path)
 {
   std::cout << "readVerilog : " << path << std::endl;
+
+	if(!ifReadLef_)
+	{
+		std::cout << "Error - Please read LEF first!" << std::endl;
+		exit(0);
+	}
 
   static std::string_view delimiters = "(),:;/#[]{}*\"\\";
   static std::string_view exceptions = "().;";
@@ -698,6 +716,11 @@ LefDefParser::readVerilog(const std::filesystem::path& path)
 
       checkIfKeyExist(macroName, macroMap_, lefMacro, "MACRO");
 
+			if( lefMacro->macroClass() == MacroClass::BLOCK)
+				numMacro_++;
+			else if( lefMacro->macroClass() == MacroClass::CORE)
+				numStdCell_++;
+
       if(++itr == end) 
       {
         std::cout << "Syntax error while reading Verilog." << std::endl;
@@ -709,6 +732,9 @@ LefDefParser::readVerilog(const std::filesystem::path& path)
       std::string cellName = std::move(*(itr));
 
       dbCell cell(cellID, cellName, lefMacro);
+
+			cell.setDx( static_cast<int>( lefMacro->sizeX() * dbUnit_ ) );
+			cell.setDy( static_cast<int>( lefMacro->sizeY() * dbUnit_ ) );
 
       strToCellID_[cellName] = cellID;
 
@@ -799,17 +825,19 @@ LefDefParser::readVerilog(const std::filesystem::path& path)
     dbPinPtrs_.push_back(&pin);
   }
 
-  std::cout << "=================================="  << std::endl;
-  std::cout << "  Netlist (.v) Statistic          "  << std::endl;
-  std::cout << "=================================="  << std::endl;
-  std::cout << "| Module Name : " << designName_ << std::endl;
-  std::cout << "| Num PI      : " << numPI_      << std::endl;
-  std::cout << "| Num PO      : " << numPO_      << std::endl;
-  std::cout << "| Num IO      : " << numIO_      << std::endl;
-  std::cout << "| Num Inst    : " << numInst_    << std::endl;
-  std::cout << "| Num Net     : " << numNet_     << std::endl;
-  std::cout << "| Num Pin     : " << numPin_     << std::endl;
-  std::cout << "=================================="  << std::endl;
+//  std::cout << "=================================="  << std::endl;
+//  std::cout << "  Netlist (.v) Statistic          "  << std::endl;
+//  std::cout << "=================================="  << std::endl;
+//  std::cout << "| Module Name : " << designName_ << std::endl;
+//  std::cout << "| Num PI      : " << numPI_      << std::endl;
+//  std::cout << "| Num PO      : " << numPO_      << std::endl;
+//  std::cout << "| Num IO      : " << numIO_      << std::endl;
+//  std::cout << "| Num Inst    : " << numInst_    << std::endl;
+//  std::cout << "| Num Net     : " << numNet_     << std::endl;
+//  std::cout << "| Num Pin     : " << numPin_     << std::endl;
+//  std::cout << "=================================="  << std::endl;
+
+	ifReadVerilog_ = false;
 }
 
 void
@@ -855,8 +883,14 @@ LefDefParser::readDefRow(strIter& itr, const strIter& end)
 
   checkIfKeyExist(siteName, siteMap_, lefSite, "LEF SITE");
 
-  dbRow row(rowName, lefSite, 
-            dbUnit_,
+	if(siteOrient != "N")
+	{
+		std::cout << "[WARNING] Row Orient " << siteOrient;
+		std::cout << " is not supported yet." << std::endl;
+		std::cout << "[WARNING] Row Orient will be regarded as N." << std::endl;
+	}
+
+  dbRow row(rowName, lefSite, dbUnit_,
             origX, origY, 
             numSiteX, numSiteY,
             stepX, stepY);
@@ -907,8 +941,8 @@ LefDefParser::readDefOneComponent(strIter& itr, const strIter& end)
 
   std::string cellStatus;
 
-  int coordiX = 0;
-  int coordiY = 0;
+  int lx = 0;
+  int ly = 0;
 
   std::string cellOrient;
 
@@ -921,8 +955,8 @@ LefDefParser::readDefOneComponent(strIter& itr, const strIter& end)
 
   assert( *(++itr) == "(" );
 
-  coordiX = std::stoi( *(++itr));
-  coordiY = std::stoi( *(++itr));
+  lx = std::stoi( *(++itr));
+  ly = std::stoi( *(++itr));
 
   assert( *(++itr) == ")" );
 
@@ -953,6 +987,11 @@ LefDefParser::readDefOneComponent(strIter& itr, const strIter& end)
 
     cell = &newCell;
 
+		if( lefMacro->macroClass() == MacroClass::BLOCK)
+			numMacro_++;
+		else if( lefMacro->macroClass() == MacroClass::CORE)
+			numStdCell_++;
+
     numInst_++;
     numDummy_++;
   }
@@ -978,8 +1017,11 @@ LefDefParser::readDefOneComponent(strIter& itr, const strIter& end)
 
   cell->setOrient(orient);
 
-  cell->setLx(coordiX);
-  cell->setLy(coordiY);
+  cell->setLx(lx);
+  cell->setLy(ly);
+
+	cell->setDx( static_cast<int>( lefMacro->sizeX() * dbUnit_ ) );
+	cell->setDy( static_cast<int>( lefMacro->sizeY() * dbUnit_ ) );
 
   numDefComps_++;
 
@@ -1130,7 +1172,13 @@ LefDefParser::readDefPins(strIter& itr, const strIter& end)
 void 
 LefDefParser::readDef(const std::filesystem::path& fileName)
 {
-  std::cout << "readDef: " << fileName << std::endl;
+  std::cout << "readDef     : " << fileName << std::endl;
+
+	if(!ifReadLef_)
+	{
+		std::cout << "Error - Please read LEF first!" << std::endl;
+		exit(0);
+	}
 
   static std::string_view delimiters = "#;";
   static std::string_view exceptions = "";
@@ -1170,17 +1218,100 @@ LefDefParser::readDef(const std::filesystem::path& fileName)
   }
 
   // Make Row Ptrs
-  for(auto& r : dbRowInsts_)
-    dbRowPtrs_.push_back(&r);
+	int coreLx = INT_MAX;
+	int coreLy = INT_MAX;
+	int coreUx = INT_MIN;
+	int coreUy = INT_MIN;
 
-  std::cout << "=================================="  << std::endl;
-  std::cout << "  DEF Statistic                   "  << std::endl;
-  std::cout << "=================================="  << std::endl;
-  std::cout << "| Design Name    : " << designName_  << std::endl;
-  std::cout << "| Num ROWS       : " << numRow_      << std::endl;
-  std::cout << "| Num COMPONENTS : " << numDefComps_ << std::endl;
-  std::cout << "| Num PINS       : " << numPin_      << std::endl;
-  std::cout << "=================================="  << std::endl;
+	// Assume the orient of row is always N
+  for(auto& r : dbRowInsts_)
+	{
+		int lx = r.origX();
+		int ly = r.origY();
+
+		int ux = lx + r.sizeX();
+		int uy = ly + r.sizeY();
+
+		if(lx < coreLx)
+			coreLx = lx;
+		if(ly < coreLy)
+			coreLy = ly;
+		if(ux > coreUx)
+			coreUx = ux;
+		if(uy > coreUy)
+			coreUy = uy;
+
+    dbRowPtrs_.push_back(&r);
+	}
+
+	die_.setCoreCoordi(coreLx, coreLy, coreUx, coreUy);
+
+	for(auto& cell : dbCellPtrs_)
+	{
+		int64_t area = static_cast<int64_t>( cell->area() );
+
+		sumTotalInstArea_ += area;
+
+		if(cell->isMacro())
+			sumMacroArea_ += area;
+
+		if(cell->isStdCell())
+			sumStdCellArea_ += area;
+	}
+
+	ifReadDef_ = true;
+
+//  std::cout << "=================================="  << std::endl;
+//  std::cout << "  DEF Statistic                   "  << std::endl;
+//  std::cout << "=================================="  << std::endl;
+//  std::cout << "| Design Name    : " << designName_  << std::endl;
+//  std::cout << "| Num ROWS       : " << numRow_      << std::endl;
+//  std::cout << "| Num COMPONENTS : " << numDefComps_ << std::endl;
+//  std::cout << "| Num PINS       : " << numPin_      << std::endl;
+//  std::cout << "=================================="  << std::endl;
+}
+
+void
+LefDefParser::printInfo()
+{
+	int dieLx = die_.lx();
+	int dieLy = die_.ly();
+	int dieUx = die_.ux();
+	int dieUy = die_.uy();
+
+	int coreLx = die_.coreLx();
+	int coreLy = die_.coreLy();
+	int coreUx = die_.coreUx();
+	int coreUy = die_.coreUy();
+
+	using namespace std;
+	cout << endl;
+	cout << "*** Summary of Information ***" << endl;
+	cout << "------------------------------------------" << endl;
+	cout << " TECHNOLOGY INFO"                           << endl;
+	cout << "------------------------------------------" << endl;
+	cout << " NUM LEF MACROS : " << macros_.size() << endl;
+	cout << " NUM LEF SITE   : " << sites_.size()  << endl;
+	cout << " DATABASE UNIT  : " << dbUnit_ << endl;
+	cout << "------------------------------------------" << endl;
+	cout << " DESIGN INFO"                               << endl;
+	cout << "------------------------------------------" << endl;
+	cout << " DESIGN NAME    : " << designName_ << endl;
+	cout << " NUM PI         : " << numPI_      << endl;
+	cout << " NUM PO         : " << numPO_      << endl;
+	cout << " NUM INSTANCE   : " << numInst_    << endl;
+	cout << " NUM MACRO      : " << numMacro_   << endl;
+	cout << " NUM STD CELL   : " << numStdCell_ << endl;
+	cout << " NUM NET        : " << numNet_     << endl;
+	cout << " NUM PIN        : " << numPin_     << endl;
+	cout << " NUM DUMMY      : " << numDummy_   << endl;
+	cout << " DIE  ( " << setw(8) << dieLx  << " ";
+	cout << setw(8) << dieLy  << " ) ( ";
+	cout << setw(8) << dieUx  << " " << dieUy  << " )\n";
+	cout << " CORE ( " << setw(8) << coreLx << " ";
+	cout << setw(8) << coreLy << " ) ( ";
+	cout << setw(8) << coreUx << " " << coreUy << " )\n";
+	cout << "------------------------------------------" << endl;
 }
 
 };

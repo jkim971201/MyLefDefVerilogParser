@@ -34,5 +34,7 @@ int main(int argc, char** argv)
 
   parser.readDef(fileName3);
 
+	parser.printInfo();
+
   return 0;
 }

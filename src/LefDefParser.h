@@ -189,7 +189,7 @@ class dbNet
   
     // Setters
     void setName(std::string& netName) { netName_ = netName; }
-    void addPin(dbPin* pin) { pins_.push_back(pin); }
+    void addPin (dbPin* pin) { pins_.push_back(pin); }
 
   private:
 
@@ -311,6 +311,8 @@ class dbIO
         ioName_     (      name) 
     {}
 
+		// If DEF is read first (before reading .v)
+		// Use this constructor
     dbIO(int ioID, 
          int origX,
          int origY,
@@ -412,15 +414,31 @@ class dbCell
 
     dbCell(int cellID, std::string& name, LefMacro* lefMacro) 
       : cellName_ (name), id_ (cellID), lefMacro_ (lefMacro)
-    {}
+    {
+			if(lefMacro_->macroClass() == MacroClass::CORE)
+			{
+				isStdCell_ = true;
+				isMacro_   = false;
+			}
+			if(lefMacro_->macroClass() == MacroClass::BLOCK)
+			{
+				isMacro_   = true;
+				isStdCell_ = false;
+			}
+
+			isDummy_ = false;
+		}
 
     // Setters
     void setName       (std::string& name   ) { cellName_   = name;       }
     void setLefMacro   (LefMacro* lefMacro  ) { lefMacro_   = lefMacro;   }
     void setOrient     (Orient cellOrient   ) { cellOrient_ = cellOrient; }
     void setFixed      (bool isFixed        ) { isFixed_    = isFixed;    }
+    void setDummy      (bool isDummy        ) { isDummy_    = isDummy;    }
     void setLx         (int lx              ) { lx_         = lx;         }
     void setLy         (int ly              ) { ly_         = ly;         }
+    void setDx         (int dx              ) { dx_         = dx;         }
+    void setDy         (int dy              ) { dy_         = dy;         }
     void addPin        (dbPin* pin          ) { pins_.push_back(pin);     }
 
     // Getters
@@ -428,8 +446,17 @@ class dbCell
     int               id()  const { return id_;         }
     int               lx()  const { return lx_;         }
     int               ly()  const { return ly_;         }
+    int               ux()  const { return lx_ + dx_;   }
+    int               uy()  const { return ly_ + dy_;   }
+    int               dx()  const { return dx_;         }
+    int               dy()  const { return dy_;         }
+		int             area()  const { return dx_ * dy_;   }
+
     LefMacro*   lefMacro()  const { return lefMacro_;   }
     bool         isFixed()  const { return isFixed_;    }
+		bool       isStdCell()  const { return isStdCell_;  }
+		bool         isMacro()  const { return isMacro_;    }
+		bool         isDummy()  const { return isDummy_;    }
     Orient        orient()  const { return cellOrient_; }
 
     const std::vector<dbPin*>& pins() const { return pins_; }
@@ -444,12 +471,19 @@ class dbCell
 
     bool isFixed_;
 
+		bool isMacro_;
+		bool isDummy_;
+		bool isStdCell_;
+
     Orient cellOrient_;
 
     std::vector<dbPin*> pins_;
 
     int lx_;
     int ly_;
+
+		int dx_;
+		int dy_;
 };
 
 class dbRow
@@ -459,7 +493,7 @@ class dbRow
     dbRow() {}
     dbRow(std::string& rowName,
           LefSite* lefSite,
-          int lefUnit,
+					int dbUnit,
           int origX, 
           int origY, 
           int numSiteX, 
@@ -474,10 +508,10 @@ class dbRow
         stepY_    ( stepY    )
     {
       sizeX_ =
-        static_cast<int>(lefSite->sizeX() * numSiteX * lefUnit);
+        static_cast<int>( lefSite->sizeX() * numSiteX * dbUnit );
 
       sizeY_ =
-        static_cast<int>(lefSite->sizeY() * numSiteY * lefUnit);
+        static_cast<int>( lefSite->sizeY() * numSiteY * dbUnit );
     }
 
     // Getters
@@ -529,11 +563,27 @@ class dbDie
       uy_ = uy;
     }
 
+    void setCoreCoordi(int lx, int ly, int ux, int uy)
+		{
+			coreLx_ = lx;
+			coreLy_ = ly;
+			coreUx_ = ux;
+			coreUy_ = uy;
+		}
+
     // Getters
-    int lx() const { return lx_; }
-    int ly() const { return ly_; }
-    int ux() const { return ux_; }
-    int uy() const { return uy_; }
+    int lx()     const { return lx_;     }
+    int ly()     const { return ly_;     }
+    int ux()     const { return ux_;     }
+    int uy()     const { return uy_;     }
+
+		int coreLx() const { return coreLx_; }
+		int coreLy() const { return coreLy_; }
+		int coreUx() const { return coreUx_; }
+		int coreUy() const { return coreUy_; }
+
+		int64_t area() const { return static_cast<int64_t>(ux_ - lx_)
+			                          * static_cast<int64_t>(uy_ - ly_); }
 
   private:
 
@@ -541,6 +591,11 @@ class dbDie
     int ly_;
     int ux_;
     int uy_;
+
+		int coreLx_;
+		int coreLy_;
+		int coreUx_;
+		int coreUy_;
 };
 
 class LefDefParser
@@ -553,6 +608,7 @@ class LefDefParser
     void readLef     (const std::filesystem::path& path);                      // Read LEF
     void readDef     (const std::filesystem::path& path);                      // Read DEF
     void readVerilog (const std::filesystem::path& path);                      // Read Netlist (.v)
+		void printInfo   ();                                                       // Print Technology & Design Information
 
     // Getters
     std::vector<dbCell*> cells() const { return dbCellPtrs_; }                 // List of DEF COMPONENTS
@@ -571,6 +627,10 @@ class LefDefParser
     std::vector<std::string> tokenize(const std::filesystem::path& path,       // Input file (including file path)
                                             std::string_view dels,             // Delimiters
                                             std::string_view exps);            // Exceptions
+
+		bool ifReadLef_;
+		bool ifReadVerilog_;
+		bool ifReadDef_;
 
     // LEF-related
     int dbUnit_;                                                               // LEF DATABASE MICRONS
@@ -596,14 +656,15 @@ class LefDefParser
     std::unordered_map<std::string, PinUsage>     strToPinUsage_;              // String - enum PIN_USAGE     Table
     std::unordered_map<std::string, Orient>       strToOrient_;                // String - enum ORIENT        Table
 
-
     // Verilog-related
     std::string designName_;                                                   // Top Module name
 
     int numPI_;                                                                // Number of PI (Primary Input )
     int numPO_;                                                                // Number of PO (Primary Output)
     int numIO_;                                                                // Number of IO (PI + PO)
-    int numInst_;                                                              // Number of Instances
+    int numInst_;                                                              // Number of Total Instances
+    int numStdCell_;                                                           // Number of Standard Cells
+    int numMacro_;                                                             // Number of Macros 
     int numNet_;                                                               // Number of Nets
     int numPin_;                                                               // Number of Pins
     int numDummy_;                                                             // Number of Dummy Cells
@@ -632,6 +693,13 @@ class LefDefParser
     // DEF-related
     int numRow_;
     int numDefComps_;
+
+		int64_t sumTotalInstArea_;
+		int64_t sumStdCellArea_;
+		int64_t sumMacroArea_;
+
+		float util_;
+		float density_;
 
     dbDie die_;
 
