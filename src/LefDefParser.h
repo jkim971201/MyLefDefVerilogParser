@@ -17,7 +17,7 @@ typedef std::vector<std::string>::iterator strIter;
 enum MacroClass   {CORE, CORE_SPACER, PAD, BLOCK, ENDCAP};
 enum SiteClass    {CORE_SITE};
 enum PinDirection {INPUT, OUTPUT, INOUT};
-enum PinUsage     {SIGNAL, POWER};
+enum PinUsage     {SIGNAL, POWER, GROUND, CLOCK};
 enum Orient       {N, S, FN, FS};  // W E FW FE is not supported
 
 struct LefRect

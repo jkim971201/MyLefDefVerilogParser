@@ -94,7 +94,7 @@ LefMacro::printInfo() const
     if(numPin++ % numPinForOneLine == 0)
       cout << endl;
 
-    if(pin.usage() == PinUsage::SIGNAL)
+    if(pin.usage() == PinUsage::SIGNAL || pin.usage() == PinUsage::CLOCK)
       cout << setw(4) << left << pin.name() << " ";
   }
 
@@ -270,8 +270,10 @@ LefDefParser::LefDefParser()
   strToPinDirection_["OUTPUT"] = PinDirection::OUTPUT;
   strToPinDirection_["INOUT" ] = PinDirection::INOUT;
 
-  strToPinUsage_["SIGNAL"] = PinUsage::SIGNAL;
-  strToPinUsage_["POWER" ] = PinUsage::POWER;
+  strToPinUsage_["SIGNAL" ] = PinUsage::SIGNAL;
+  strToPinUsage_["POWER"  ] = PinUsage::POWER;
+  strToPinUsage_["GROUND" ] = PinUsage::GROUND;
+  strToPinUsage_["CLOCK"  ] = PinUsage::CLOCK;
 
   strToOrient_["N" ] = Orient::N;
   strToOrient_["S" ] = Orient::S;
