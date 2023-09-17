@@ -1,3 +1,5 @@
+#pragma once
+
 #include <iostream>
 #include <memory>
 #include <vector>
@@ -9,7 +11,7 @@
 namespace LefDefDB
 {
 
-// For Parsing LEF
+// For Parsing
 typedef std::vector<std::string>::iterator strIter;
 
 enum MacroClass   {CORE, CORE_SPACER, PAD, BLOCK, ENDCAP};
@@ -303,6 +305,8 @@ class dbIO
 {
   public:
 
+    // If Verilog is read first (before reading .def)
+    // Use this constructor
     dbIO(int ioID, 
          PinDirection direction,
          std::string& name) 
@@ -311,8 +315,8 @@ class dbIO
         ioName_     (      name) 
     {}
 
-		// If DEF is read first (before reading .v)
-		// Use this constructor
+    // If DEF is read first (before reading .v)
+    // Use this constructor
     dbIO(int ioID, 
          int origX,
          int origY,
@@ -415,19 +419,19 @@ class dbCell
     dbCell(int cellID, std::string& name, LefMacro* lefMacro) 
       : cellName_ (name), id_ (cellID), lefMacro_ (lefMacro)
     {
-			if(lefMacro_->macroClass() == MacroClass::CORE)
-			{
-				isStdCell_ = true;
-				isMacro_   = false;
-			}
-			if(lefMacro_->macroClass() == MacroClass::BLOCK)
-			{
-				isMacro_   = true;
-				isStdCell_ = false;
-			}
+      if(lefMacro_->macroClass() == MacroClass::CORE)
+      {
+        isStdCell_ = true;
+        isMacro_   = false;
+      }
+      if(lefMacro_->macroClass() == MacroClass::BLOCK)
+      {
+        isMacro_   = true;
+        isStdCell_ = false;
+      }
 
-			isDummy_ = false;
-		}
+      isDummy_ = false;
+    }
 
     // Setters
     void setName       (std::string& name   ) { cellName_   = name;       }
@@ -450,14 +454,14 @@ class dbCell
     int               uy()  const { return ly_ + dy_;   }
     int               dx()  const { return dx_;         }
     int               dy()  const { return dy_;         }
-		int64_t         area()  const { return static_cast<int64_t>(dx_) 
-			                                   * static_cast<int64_t>(dy_); }
+    int64_t         area()  const { return static_cast<int64_t>(dx_) 
+                                         * static_cast<int64_t>(dy_); }
 
     LefMacro*   lefMacro()  const { return lefMacro_;   }
     bool         isFixed()  const { return isFixed_;    }
-		bool       isStdCell()  const { return isStdCell_;  }
-		bool         isMacro()  const { return isMacro_;    }
-		bool         isDummy()  const { return isDummy_;    }
+    bool       isStdCell()  const { return isStdCell_;  }
+    bool         isMacro()  const { return isMacro_;    }
+    bool         isDummy()  const { return isDummy_;    }
     Orient        orient()  const { return cellOrient_; }
 
     const std::vector<dbPin*>& pins() const { return pins_; }
@@ -472,9 +476,9 @@ class dbCell
 
     bool isFixed_;
 
-		bool isMacro_;
-		bool isDummy_;
-		bool isStdCell_;
+    bool isMacro_;
+    bool isDummy_;
+    bool isStdCell_;
 
     Orient cellOrient_;
 
@@ -483,8 +487,8 @@ class dbCell
     int lx_;
     int ly_;
 
-		int dx_;
-		int dy_;
+    int dx_;
+    int dy_;
 };
 
 class dbRow
@@ -494,7 +498,7 @@ class dbRow
     dbRow() {}
     dbRow(std::string& rowName,
           LefSite* lefSite,
-					int dbUnit,
+          int dbUnit,
           int origX, 
           int origY, 
           int numSiteX, 
@@ -565,12 +569,12 @@ class dbDie
     }
 
     void setCoreCoordi(int lx, int ly, int ux, int uy)
-		{
-			coreLx_ = lx;
-			coreLy_ = ly;
-			coreUx_ = ux;
-			coreUy_ = uy;
-		}
+    {
+      coreLx_ = lx;
+      coreLy_ = ly;
+      coreUx_ = ux;
+      coreUy_ = uy;
+    }
 
     // Getters
     int lx()     const { return lx_;     }
@@ -578,16 +582,16 @@ class dbDie
     int ux()     const { return ux_;     }
     int uy()     const { return uy_;     }
 
-		int coreLx() const { return coreLx_; }
-		int coreLy() const { return coreLy_; }
-		int coreUx() const { return coreUx_; }
-		int coreUy() const { return coreUy_; }
+    int coreLx() const { return coreLx_; }
+    int coreLy() const { return coreLy_; }
+    int coreUx() const { return coreUx_; }
+    int coreUy() const { return coreUy_; }
 
-		int64_t area() const { return static_cast<int64_t>(ux_ - lx_)
-			                          * static_cast<int64_t>(uy_ - ly_); }
-		
-		int64_t coreArea() const { return static_cast<int64_t>(coreUx_ - coreLx_)
-			                              * static_cast<int64_t>(coreUy_ - coreLy_); }
+    int64_t area() const { return static_cast<int64_t>(ux_ - lx_)
+                                * static_cast<int64_t>(uy_ - ly_); }
+    
+    int64_t coreArea() const { return static_cast<int64_t>(coreUx_ - coreLx_)
+                                    * static_cast<int64_t>(coreUy_ - coreLy_); }
 
   private:
 
@@ -596,10 +600,10 @@ class dbDie
     int ux_;
     int uy_;
 
-		int coreLx_;
-		int coreLy_;
-		int coreUx_;
-		int coreUy_;
+    int coreLx_;
+    int coreLy_;
+    int coreUx_;
+    int coreUy_;
 };
 
 class LefDefParser
@@ -612,7 +616,7 @@ class LefDefParser
     void readLef     (const std::filesystem::path& path);                      // Read LEF
     void readDef     (const std::filesystem::path& path);                      // Read DEF
     void readVerilog (const std::filesystem::path& path);                      // Read Netlist (.v)
-		void printInfo   ();                                                       // Print Technology & Design Information
+    void printInfo   ();                                                       // Print Technology & Design Information
 
     // Getters
     std::vector<dbCell*> cells() const { return dbCellPtrs_; }                 // List of DEF COMPONENTS
@@ -620,8 +624,8 @@ class LefDefParser
     std::vector<dbPin*>   pins() const { return dbPinPtrs_;  }                 // List of Internal + External Pins
     std::vector<dbNet*>   nets() const { return dbNetPtrs_;  }                 // List of Nets
     std::vector<dbRow*>   rows() const { return dbRowPtrs_;  }                 // List of DEF ROWS
-
     const dbDie*           die() const { return &die_;       }                 // Ptr of dbDie
+		int                 dbUnit() const { return dbUnit_;     }                 // Get DB Unit (normally 1000 / 2000)
 
     std::string     designName() const { return designName_; }                 // Returns the top module name (from .v)
 
@@ -632,9 +636,9 @@ class LefDefParser
                                             std::string_view dels,             // Delimiters
                                             std::string_view exps);            // Exceptions
 
-		bool ifReadLef_;
-		bool ifReadVerilog_;
-		bool ifReadDef_;
+    bool ifReadLef_;
+    bool ifReadVerilog_;
+    bool ifReadDef_;
 
     // LEF-related
     int dbUnit_;                                                               // LEF DATABASE MICRONS
@@ -698,12 +702,12 @@ class LefDefParser
     int numRow_;
     int numDefComps_;
 
-		int64_t sumTotalInstArea_;
-		int64_t sumStdCellArea_;
-		int64_t sumMacroArea_;
+    int64_t sumTotalInstArea_;
+    int64_t sumStdCellArea_;
+    int64_t sumMacroArea_;
 
-		float util_;
-		float density_;
+    float util_;
+    float density_;
 
     dbDie die_;
 

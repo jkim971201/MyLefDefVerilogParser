@@ -11,30 +11,42 @@
 #include <algorithm>
 
 #include "LefDefParser.h"
+#include "CmdInterpreter.h"
+
+using namespace LefDefDB;
 
 int main(int argc, char** argv)
 {
-  if(argc < 4)
+  if(argc < 2)
   {
     std::cout << "Please give input file" << std::endl;
     exit(0);
   }
 
-  std::filesystem::path fileName  = argv[1];
+//  std::filesystem::path fileName  = argv[1];
+//
+//  std::filesystem::path fileName2 = argv[2];
+//
+//  std::filesystem::path fileName3 = argv[3];
+//
+//  LefDefDB::LefDefParser parser;
+//
+//  parser.readLef(fileName);
+//
+//  parser.readVerilog(fileName2);
+//
+//  parser.readDef(fileName3);
+//
+//  parser.printInfo();
 
-  std::filesystem::path fileName2 = argv[2];
+  std::filesystem::path cmdfile = argv[1];
 
-  std::filesystem::path fileName3 = argv[3];
+  std::shared_ptr<LefDefParser> parser;
+  parser = std::make_shared<LefDefParser>();
 
-  LefDefDB::LefDefParser parser;
+  CmdInterpreter cmd(parser);
 
-  parser.readLef(fileName);
-
-  parser.readVerilog(fileName2);
-
-  parser.readDef(fileName3);
-
-	parser.printInfo();
+  cmd.readCmd(cmdfile);
 
   return 0;
 }

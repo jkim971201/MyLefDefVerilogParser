@@ -59,6 +59,21 @@ void checkIfKeyExist(K key, M& map, V& value, const std::string keyType)
     value = checkKey->second;
 }
 
+// K-Key, M-Map, V-Value
+template <typename K, typename M, typename V>
+void checkIfKeyExist(K key, M& map, V& value, const std::string keyType, bool& exist)
+{
+  auto checkKey = map.find(key);
+
+  if(checkKey == map.end())
+    exist = false;
+  else
+  {
+    value = checkKey->second;
+    exist = true;
+  }
+}
+
 // LEF-related
 void 
 LefMacro::printInfo() const
@@ -236,12 +251,12 @@ LefDefParser::LefDefParser()
     numMacro_          (    0),
     numDefComps_       (    0),
     dbUnit_            ( 1000),
-		sumTotalInstArea_  (    0),
-		sumStdCellArea_    (    0),
-		sumMacroArea_      (    0),
-		ifReadLef_         (false),
-		ifReadVerilog_     (false),
-		ifReadDef_         (false)
+    sumTotalInstArea_  (    0),
+    sumStdCellArea_    (    0),
+    sumMacroArea_      (    0),
+    ifReadLef_         (false),
+    ifReadVerilog_     (false),
+    ifReadDef_         (false)
 {
   strToMacroClass_["CORE"       ] = MacroClass::CORE;
   strToMacroClass_["CORE_SPACER"] = MacroClass::CORE_SPACER;
@@ -500,7 +515,7 @@ LefDefParser::readLefSite(strIter& itr, const strIter& end)
 
   sites_.push_back(lefSite);
 
-	int numSites = sites_.size();
+  int numSites = sites_.size();
 
   siteMap_[siteName] = &(sites_[numSites - 1]);
 
@@ -562,7 +577,7 @@ LefDefParser::readLef(const std::filesystem::path& fileName)
   for(auto& macro : macros_)
     macroMap_[macro.name()] = &macro;
 
-	ifReadLef_ = true;
+  ifReadLef_ = true;
 
   // printLefStatistic();
 }
@@ -591,11 +606,11 @@ LefDefParser::readVerilog(const std::filesystem::path& path)
 {
   std::cout << "Read " << std::string(path) << std::endl;
 
-	if(!ifReadLef_)
-	{
-		std::cout << "Error - Please read LEF first!" << std::endl;
-		exit(0);
-	}
+  if(!ifReadLef_)
+  {
+    std::cout << "Error - Please read LEF first!" << std::endl;
+    exit(0);
+  }
 
   static std::string_view delimiters = "(),:;/#[]{}*\"\\";
   static std::string_view exceptions = "().;";
@@ -716,10 +731,10 @@ LefDefParser::readVerilog(const std::filesystem::path& path)
 
       checkIfKeyExist(macroName, macroMap_, lefMacro, "MACRO");
 
-			if( lefMacro->macroClass() == MacroClass::BLOCK)
-				numMacro_++;
-			else if( lefMacro->macroClass() == MacroClass::CORE)
-				numStdCell_++;
+      if( lefMacro->macroClass() == MacroClass::BLOCK)
+        numMacro_++;
+      else if( lefMacro->macroClass() == MacroClass::CORE)
+        numStdCell_++;
 
       if(++itr == end) 
       {
@@ -733,8 +748,8 @@ LefDefParser::readVerilog(const std::filesystem::path& path)
 
       dbCell cell(cellID, cellName, lefMacro);
 
-			cell.setDx( static_cast<int>( lefMacro->sizeX() * dbUnit_ ) );
-			cell.setDy( static_cast<int>( lefMacro->sizeY() * dbUnit_ ) );
+      cell.setDx( static_cast<int>( lefMacro->sizeX() * dbUnit_ ) );
+      cell.setDy( static_cast<int>( lefMacro->sizeY() * dbUnit_ ) );
 
       strToCellID_[cellName] = cellID;
 
@@ -837,7 +852,7 @@ LefDefParser::readVerilog(const std::filesystem::path& path)
 //  std::cout << "| Num Pin     : " << numPin_     << std::endl;
 //  std::cout << "=================================="  << std::endl;
 
-	ifReadVerilog_ = false;
+  ifReadVerilog_ = false;
 }
 
 void
@@ -883,12 +898,12 @@ LefDefParser::readDefRow(strIter& itr, const strIter& end)
 
   checkIfKeyExist(siteName, siteMap_, lefSite, "LEF SITE");
 
-	if(siteOrient != "N")
-	{
-		std::cout << "[WARNING] Row Orient " << siteOrient;
-		std::cout << " is not supported yet." << std::endl;
-		std::cout << "[WARNING] Row Orient will be regarded as N." << std::endl;
-	}
+  if(siteOrient != "N")
+  {
+    std::cout << "[WARNING] Row Orient " << siteOrient;
+    std::cout << " is not supported yet." << std::endl;
+    std::cout << "[WARNING] Row Orient will be regarded as N." << std::endl;
+  }
 
   dbRow row(rowName, lefSite, dbUnit_,
             origX, origY, 
@@ -987,10 +1002,10 @@ LefDefParser::readDefOneComponent(strIter& itr, const strIter& end)
 
     cell = &newCell;
 
-		if( lefMacro->macroClass() == MacroClass::BLOCK)
-			numMacro_++;
-		else if( lefMacro->macroClass() == MacroClass::CORE)
-			numStdCell_++;
+    if( lefMacro->macroClass() == MacroClass::BLOCK)
+      numMacro_++;
+    else if( lefMacro->macroClass() == MacroClass::CORE)
+      numStdCell_++;
 
     numInst_++;
     numDummy_++;
@@ -1020,8 +1035,8 @@ LefDefParser::readDefOneComponent(strIter& itr, const strIter& end)
   cell->setLx(lx);
   cell->setLy(ly);
 
-	cell->setDx( static_cast<int>( lefMacro->sizeX() * dbUnit_ ) );
-	cell->setDy( static_cast<int>( lefMacro->sizeY() * dbUnit_ ) );
+  cell->setDx( static_cast<int>( lefMacro->sizeX() * dbUnit_ ) );
+  cell->setDy( static_cast<int>( lefMacro->sizeY() * dbUnit_ ) );
 
   numDefComps_++;
 
@@ -1130,23 +1145,34 @@ LefDefParser::readDefOnePin(strIter& itr, const strIter& end)
 
   Orient orient = strToOrient_[pinOrient];
 
-	if(orient != Orient::N)
-	{
-		std::cout << "[WARNING] Orient " << pinOrient;
-		std::cout << " is not supported yet." << std::endl;
-		std::cout << "[WARNING] Orient will be regarded as N." << std::endl;
-	}
+  if(orient != Orient::N)
+  {
+    std::cout << "[WARNING] Orient " << pinOrient;
+    std::cout << " is not supported yet." << std::endl;
+    std::cout << "[WARNING] Orient will be regarded as N." << std::endl;
+  }
 
-  checkIfKeyExist(pinName, strToIOID_, ioID, "PIN");
+  bool ifKeyExist;
+  checkIfKeyExist(pinName, strToIOID_, ioID, "PIN", ifKeyExist);
 
-  dbIO* io = dbIOPtrs_[ioID];
-
-  assert(io->pin()->net()->name() == netName);
-
-  io->setLocation(originX, originY, 
-                  offsetLx, offsetLy, offsetUx, offsetUy);
-
-  io->setOrient(orient);
+  if(!ifReadVerilog_ && !ifKeyExist)
+  {
+    std::cout << "This mode is not supported yet..." << std::endl;
+    std::cout << "Read verilog first please..." << std::endl;
+  }
+  else if(ifReadVerilog_ && !ifKeyExist)
+  {
+    std::cout << "Error PIN ";
+    std::cout << pinName << " is missing in DB." << std::endl;
+    exit(0);
+  }
+  else if(ifKeyExist)
+  {
+    dbIO* io = dbIOPtrs_[ioID];
+    //assert(io->pin()->net()->name() == netName);
+    io->setLocation(originX, originY, offsetLx, offsetLy, offsetUx, offsetUy);
+    io->setOrient(orient);
+  }
 }
 
 void
@@ -1174,11 +1200,11 @@ LefDefParser::readDef(const std::filesystem::path& fileName)
 {
   std::cout << "Read " << std::string(fileName) << std::endl;
 
-	if(!ifReadLef_)
-	{
-		std::cout << "Error - Please read LEF first!" << std::endl;
-		exit(0);
-	}
+  if(!ifReadLef_)
+  {
+    std::cout << "Error - Please read LEF first!" << std::endl;
+    exit(0);
+  }
 
   static std::string_view delimiters = "#;";
   static std::string_view exceptions = "";
@@ -1207,128 +1233,119 @@ LefDefParser::readDef(const std::filesystem::path& fileName)
       readDefComponents(itr, end);
     else if(*itr == "PINS")
       readDefPins(itr, end);
-		else if(*itr == "PROPERTYPEDEFINITIONS")
-		{
-			// Temporary code for ignoring type definitions
-			while(*itr != "END")
-			 itr++;
-		}
+    else if(*itr == "PROPERTYPEDEFINITIONS")
+    {
+      // Temporary code for ignoring type definitions
+      while(*itr != "END")
+       itr++;
+    }
     else if(*itr == "END" && *(itr + 1) == "DESIGN")
       break;
   }
 
   // Make Row Ptrs
-	int coreLx = INT_MAX;
-	int coreLy = INT_MAX;
-	int coreUx = INT_MIN;
-	int coreUy = INT_MIN;
+  int coreLx = INT_MAX;
+  int coreLy = INT_MAX;
+  int coreUx = INT_MIN;
+  int coreUy = INT_MIN;
 
-	// Assume the orient of row is always N
+  // Assume the orient of row is always N
   for(auto& r : dbRowInsts_)
-	{
-		int lx = r.origX();
-		int ly = r.origY();
+  {
+    int lx = r.origX();
+    int ly = r.origY();
 
-		int ux = lx + r.sizeX();
-		int uy = ly + r.sizeY();
+    int ux = lx + r.sizeX();
+    int uy = ly + r.sizeY();
 
-		if(lx < coreLx)
-			coreLx = lx;
-		if(ly < coreLy)
-			coreLy = ly;
-		if(ux > coreUx)
-			coreUx = ux;
-		if(uy > coreUy)
-			coreUy = uy;
+    if(lx < coreLx)
+      coreLx = lx;
+    if(ly < coreLy)
+      coreLy = ly;
+    if(ux > coreUx)
+      coreUx = ux;
+    if(uy > coreUy)
+      coreUy = uy;
 
     dbRowPtrs_.push_back(&r);
-	}
+  }
 
-	die_.setCoreCoordi(coreLx, coreLy, coreUx, coreUy);
+  die_.setCoreCoordi(coreLx, coreLy, coreUx, coreUy);
 
-	for(auto& cell : dbCellPtrs_)
-	{
-		int64_t area = static_cast<int64_t>( cell->area() );
+  for(auto& cell : dbCellPtrs_)
+  {
+    int64_t area = static_cast<int64_t>( cell->area() );
 
-		sumTotalInstArea_ += area;
+    sumTotalInstArea_ += area;
 
-		if(cell->isMacro())
-			sumMacroArea_ += area;
+    if(cell->isMacro())
+      sumMacroArea_ += area;
 
-		if(cell->isStdCell())
-			sumStdCellArea_ += area;
-	}
+    if(cell->isStdCell())
+      sumStdCellArea_ += area;
+  }
 
-	int64_t coreArea = die_.coreArea();
+  int64_t coreArea = die_.coreArea();
 
-	util_    = static_cast<float>( sumTotalInstArea_) 
-		       / static_cast<float>( coreArea );
+  util_    = static_cast<float>( sumTotalInstArea_) 
+           / static_cast<float>( coreArea );
 
-	density_ = static_cast<float>( sumStdCellArea_ )
-			     / static_cast<float>( coreArea - sumMacroArea_ );
+  density_ = static_cast<float>( sumStdCellArea_ )
+           / static_cast<float>( coreArea - sumMacroArea_ );
 
-	ifReadDef_ = true;
-
-//  std::cout << "=================================="  << std::endl;
-//  std::cout << "  DEF Statistic                   "  << std::endl;
-//  std::cout << "=================================="  << std::endl;
-//  std::cout << "| Design Name    : " << designName_  << std::endl;
-//  std::cout << "| Num ROWS       : " << numRow_      << std::endl;
-//  std::cout << "| Num COMPONENTS : " << numDefComps_ << std::endl;
-//  std::cout << "| Num PINS       : " << numPin_      << std::endl;
-//  std::cout << "=================================="  << std::endl;
+  ifReadDef_ = true;
 }
 
 void
 LefDefParser::printInfo()
 {
-	int dieLx = die_.lx();
-	int dieLy = die_.ly();
-	int dieUx = die_.ux();
-	int dieUy = die_.uy();
+  int dieLx = die_.lx();
+  int dieLy = die_.ly();
+  int dieUx = die_.ux();
+  int dieUy = die_.uy();
 
-	int coreLx = die_.coreLx();
-	int coreLy = die_.coreLy();
-	int coreUx = die_.coreUx();
-	int coreUy = die_.coreUy();
+  int coreLx = die_.coreLx();
+  int coreLy = die_.coreLy();
+  int coreUx = die_.coreUx();
+  int coreUy = die_.coreUy();
 
-	using namespace std;
-	cout << endl;
-	cout << "*** Summary of Information ***" << endl;
-	cout << "---------------------------------------------" << endl;
-	cout << " TECHNOLOGY INFO"                           << endl;
-	cout << "---------------------------------------------" << endl;
-	cout << " NUM LEF MACRO    : " << macros_.size() << endl;
-	cout << " NUM LEF SITE     : " << sites_.size()  << endl;
-	cout << " DATABASE UNIT    : " << dbUnit_ << endl;
-	cout << "---------------------------------------------" << endl;
-	cout << " DESIGN INFO"                               << endl;
-	cout << "---------------------------------------------" << endl;
-	cout << " DESIGN NAME      : " << designName_ << endl;
-	cout << " NUM PI           : " << numPI_      << endl;
-	cout << " NUM PO           : " << numPO_      << endl;
-	cout << " NUM IO           : " << numIO_      << endl;
-	cout << " NUM INSTANCE     : " << numInst_    << endl;
-	cout << " NUM MACRO        : " << numMacro_   << endl;
-	cout << " NUM STD CELL     : " << numStdCell_ << endl;
-	cout << " NUM NET          : " << numNet_     << endl;
-	cout << " NUM PIN          : " << numPin_     << endl;
-	cout << " NUM DUMMY        : " << numDummy_   << endl;
-	cout << " NUM ROW          : " << numRow_     << endl;
-	cout << " UTIL             : " << fixed << setprecision(2) << util_    * 100 << "%\n";
-	cout << " DENSITIY         : " << fixed << setprecision(2) << density_ * 100 << "%\n";
-	cout << " AREA (INSTANACE) : " << setw(16) << sumTotalInstArea_ << endl;
-	cout << " AREA (STD CELL)  : " << setw(16) << sumStdCellArea_   << endl;
-	cout << " AREA (MACRO)     : " << setw(16) << sumMacroArea_     << endl;
-	cout << " AREA (DIE)       : " << setw(16) << die_.area()       << endl;
-	cout << " AREA (CORE)      : " << setw(16) << die_.coreArea()   << endl;
-	cout << " DIE  ( " << setw(5) << dieLx  << " ";
-	cout << setw(5) << dieLy  << " ) ( ";
-	cout << setw(8) << dieUx  << " " << dieUy  << " )\n";
-	cout << " CORE ( " << setw(5) << coreLx << " ";
-	cout << setw(5) << coreLy << " ) ( ";
-	cout << setw(8) << coreUx << " " << coreUy << " )\n";
-	cout << "---------------------------------------------" << endl;
+  using namespace std;
+  cout << endl;
+  cout << "*** Summary of Information ***" << endl;
+  cout << "---------------------------------------------" << endl;
+  cout << " TECHNOLOGY INFO"                           << endl;
+  cout << "---------------------------------------------" << endl;
+  cout << " NUM LEF MACRO    : " << macros_.size() << endl;
+  cout << " NUM LEF SITE     : " << sites_.size()  << endl;
+  cout << " DATABASE UNIT    : " << dbUnit_ << endl;
+  cout << "---------------------------------------------" << endl;
+  cout << " DESIGN INFO"                               << endl;
+  cout << "---------------------------------------------" << endl;
+  cout << " DESIGN NAME      : " << designName_ << endl;
+  cout << " NUM PI           : " << numPI_      << endl;
+  cout << " NUM PO           : " << numPO_      << endl;
+  cout << " NUM IO           : " << numIO_      << endl;
+  cout << " NUM INSTANCE     : " << numInst_    << endl;
+  cout << " NUM MACRO        : " << numMacro_   << endl;
+  cout << " NUM STD CELL     : " << numStdCell_ << endl;
+  cout << " NUM NET          : " << numNet_     << endl;
+  cout << " NUM PIN          : " << numPin_     << endl;
+  cout << " NUM DUMMY        : " << numDummy_   << endl;
+  cout << " NUM ROW          : " << numRow_     << endl;
+  cout << " UTIL             : " << fixed << setprecision(2) << util_    * 100 << "%\n";
+  cout << " DENSITIY         : " << fixed << setprecision(2) << density_ * 100 << "%\n";
+  cout << " AREA (INSTANACE) : " << setw(16) << sumTotalInstArea_ << endl;
+  cout << " AREA (STD CELL)  : " << setw(16) << sumStdCellArea_   << endl;
+  cout << " AREA (MACRO)     : " << setw(16) << sumMacroArea_     << endl;
+  cout << " AREA (DIE)       : " << setw(16) << die_.area()       << endl;
+  cout << " AREA (CORE)      : " << setw(16) << die_.coreArea()   << endl;
+  cout << " DIE  ( " << setw(5) << dieLx  << " ";
+  cout << setw(5) << dieLy  << " ) ( ";
+  cout << setw(8) << dieUx  << " " << dieUy  << " )\n";
+  cout << " CORE ( " << setw(5) << coreLx << " ";
+  cout << setw(5) << coreLy << " ) ( ";
+  cout << setw(8) << coreUx << " " << coreUy << " )\n";
+  cout << "---------------------------------------------" << endl;
 }
 
 };
