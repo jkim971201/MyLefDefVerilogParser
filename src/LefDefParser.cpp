@@ -6,11 +6,45 @@
 #include <sstream>
 #include <algorithm>
 #include <cfloat>
+#include <regex>
 
 #include "LefDefParser.h"
 
 namespace LefDefDB
 {
+
+inline bool isNumeric(const std::string& str)
+{
+  return std::regex_match( str, std::regex("[0-9]+") );
+}
+
+// Check if the given string is contained in the squared bracket
+inline bool isSqrBracket(const std::string& str)
+{
+  return (str[0] == '[' && str.back() == ']');
+}
+
+inline int getBusNumber(const std::string& str)
+{
+  // RegExp-> xx:0
+  // {1} means there has to be only one zero
+  std::regex re("([0-9]+):[0]{1}");
+  std::regex nu("([0-9]+)");
+
+  // str => [xx:0]
+  auto begin = std::sregex_iterator( str.begin() + 1, str.end() - 1, re);
+  auto end   = std::sregex_iterator();
+
+  if(begin == end)
+  {
+    std::cout << "Bus syntax error..." << std::endl;
+    exit(0);
+  }
+
+  auto nuRegItr = std::sregex_iterator( str.begin() + 1, str.end() - 1, nu);
+
+  return std::stoi( nuRegItr->str() );
+}
 
 // Iteratively apply closure c on each token inside the parentheses pair
 // I : Iterator C: Closure 
@@ -38,7 +72,21 @@ auto findParenthesePair(const I start, const I end, C&& c)
   if(left == end || right == end) 
     return end;
   else
-    for(++left; left != right; ++left) { c(*left); }
+	{
+    for(++left; left != right; ++left) 
+		{ 
+			if( isSqrBracket( *(left + 1) ) )
+			{
+				std::cout << "*left     " << *left << std::endl;
+				std::cout << "*left + 1 " << *(left + 1) << std::endl;
+				std::string tempStr = *left + *(left + 1);
+				c(tempStr);
+				left++;
+			}
+			else
+				c(*left); 
+		}
+	}
 
   return right;
 }
@@ -133,6 +181,22 @@ LefPin::computeBBox()
   uy_ = maxY;
 }
 
+// Case #1: if a character is both in the dels and exps
+// -> it will be push_back in the vector<string>
+
+// Case #2: if a character is only in the dels
+// -> it will be only used as a separator
+
+// Case #3: if a character is only in the exps
+// -> it will be regarded as normal chracter (nothing special)
+
+// [Example] 
+// string: a,bc.(3, 2) 
+// dels "()," 
+// exps "(."
+
+// results = { "a", "bc." "(", "3", "2" }
+
 std::vector<std::string>
 LefDefParser::tokenize(const std::filesystem::path& path, 
                        std::string_view dels,
@@ -155,8 +219,8 @@ LefDefParser::tokenize(const std::filesystem::path& path,
   ifs.read(buffer.data(), fsize);
   buffer[fsize] = 0;
   
-  // Mart out the comment
-  for(size_t i=0; i<fsize; ++i) 
+  // Mark out the comment
+  for(size_t i=0; i < fsize; ++i) 
   {
     // Block comment
     if(buffer[i] == '/' && buffer[i+1] == '*') 
@@ -614,7 +678,8 @@ LefDefParser::readVerilog(const std::filesystem::path& path)
     exit(0);
   }
 
-  static std::string_view delimiters = "(),:;/#[]{}*\"\\";
+  // static std::string_view delimiters = "(),:;/#[]{}*\"\\";
+  static std::string_view delimiters = "(),;#{}*";
   static std::string_view exceptions = "().;";
   
   auto tokens = tokenize(path, delimiters, exceptions);
@@ -669,47 +734,92 @@ LefDefParser::readVerilog(const std::filesystem::path& path)
 
       while(++itr != end && *itr != ";") 
       {
-        std::string pinName = std::move( *(itr) );
-        std::string netName = pinName;
-        std::string ioName  = pinName;
+				// To handle [0:0] case...
+				bool isBus = false;
+        int numBus = 1;
 
-        int pinID = numPin_;
-        int netID = numNet_;
-        int  ioID = numIO_;
+        if( isSqrBracket( *itr ) )
+				{
+					isBus  = true;
+          numBus = getBusNumber( *(itr++) ) + 1;
+				}
 
-        dbIO io(ioID, direction, ioName);
+        std::string baseName = std::move( *(itr) );
+        std::string pinName  = baseName;
 
-        dbPin pin(pinID, 
-                  netID, 
-                  ioID,
-                  pinName);
+        //std::cout << baseName << std::endl;
+        //std::cout << numBus << std::endl;
 
-        dbNet net(netID, netName);
+        // input xx[31:0];
+        // numBus   = 32
+        // baseName = xx
+        // pinName  = baseName + i (i -> 0 ~ 31)
+        for(int curIdx = 0; curIdx < numBus; curIdx++)
+        {
+          if(numBus > 1)
+            pinName = baseName + "[" + std::to_string(curIdx) + "]";
 
-        dbPinInsts_.push_back(pin);
-        dbNetInsts_.push_back(net);
-        dbIOInsts_.push_back(io);
-
-        strToPinID_[pinName] = pinID;
-        strToNetID_[netName] = netID;
-        strToIOID_[ioName]   = ioID;
-
-        numPin_++;
-        numNet_++;
-        numIO_++;
-
-        if(direction == PinDirection::INPUT)
-          numPI_++;
-        else
-          numPO_++;
+          std::string netName = pinName;
+          std::string ioName  = pinName;
+  
+          int pinID = numPin_;
+          int netID = numNet_;
+          int  ioID = numIO_;
+  
+          dbIO io(ioID, direction, ioName);
+  
+          dbPin pin(pinID, 
+                    netID, 
+                    ioID,
+                    pinName);
+  
+          dbNet net(netID, netName);
+  
+          dbPinInsts_.push_back(pin);
+          dbNetInsts_.push_back(net);
+          dbIOInsts_.push_back(io);
+  
+          strToPinID_[pinName] = pinID;
+          strToNetID_[netName] = netID;
+          strToIOID_[ioName]   = ioID;
+  
+          numPin_++;
+          numNet_++;
+          numIO_++;
+  
+          if(direction == PinDirection::INPUT)
+            numPI_++;
+          else
+            numPO_++;
+        }
       }
     }
     else if(*itr == "wire") 
     {
-      while(++itr != end && *itr != ";") 
+			// To handle [0:0] case...
+			bool isBus = false;
+      int numBus = 1;
+
+      if( isSqrBracket( *(++itr) ) )
+			{
+				isBus  = true;
+        numBus = getBusNumber( *(itr++) ) + 1;
+			}
+
+      std::string baseName = std::move( *(itr) );
+        
+      // wire xx[31:0];
+      // numBus   = 32
+      // baseName = xx
+      // netName  = baseName + i (i -> 0 ~ 31)
+      for(int curIdx = 0; curIdx < numBus; curIdx++)
       {
         int netID = numNet_;
-        std::string netName = std::move( *(itr) );
+        std::string netName = baseName;
+
+				if(numBus > 1 || isBus)
+					netName = baseName + "[" + std::to_string(curIdx) + "]";
+
         dbNet net(netID, netName);
         dbNetInsts_.push_back(net);
 
@@ -724,62 +834,91 @@ LefDefParser::readVerilog(const std::filesystem::path& path)
           cout << setw(7) << right << numNet_ << " Nets..." << endl;
         }
       }
+
+			while( *itr != ";" && itr != end)
+				itr++;
     }
     else 
     {
       std::string macroName = std::move(*itr);
 
-      LefMacro* lefMacro;
-
-      checkIfKeyExist(macroName, macroMap_, lefMacro, "MACRO");
-
-      if( lefMacro->macroClass() == MacroClass::BLOCK)
-        numMacro_++;
-      else if( lefMacro->macroClass() == MacroClass::CORE)
-        numStdCell_++;
-
-      if(++itr == end) 
+			// TODO
+			// how to handle "assign"?
+      if(macroName == "assign")
       {
-        std::cout << "Syntax error while reading Verilog." << std::endl;
-        exit(0);
+        std::string netName = std::string( *(++itr) );
+
+				while( *(itr + 1) != ";" && itr != end)
+					itr++;
       }
+      else
+      {
+        LefMacro* lefMacro;
 
-      int cellID = numInst_;
-
-      std::string cellName = std::move(*(itr));
-
-      dbCell cell(cellID, cellName, lefMacro);
-
-      cell.setDx( static_cast<int>( lefMacro->sizeX() * dbUnit_ ) );
-      cell.setDy( static_cast<int>( lefMacro->sizeY() * dbUnit_ ) );
-
-      strToCellID_[cellName] = cellID;
-
-      std::string portName;
-      std::string netName;
-
-      itr = findParenthesePair(itr, end, [&] (auto& str) mutable { 
-        if(str == ")" || str == "(") 
-          return;
-        else if(str[0] == '.') 
-          portName = std::move( str.substr(1) );
-        else 
+        checkIfKeyExist(macroName, macroMap_, lefMacro, "MACRO");
+  
+        if( lefMacro->macroClass() == MacroClass::BLOCK)
+          numMacro_++;
+        else if( lefMacro->macroClass() == MacroClass::CORE)
+          numStdCell_++;
+  
+        if(++itr == end) 
         {
-          int netID;
-          netName = std::move( str );
-          checkIfKeyExist(netName, strToNetID_, netID, "Net");
-
-          int pinID = numPin_;
-
-          std::string pinName = portName + ":" + cellName;
-          dbPin pin(pinID, cellID, netID, pinName, lefMacro->getPin(portName));
-
-          dbPinInsts_.push_back(pin);
-
-          strToPinID_[pinName] = pinID;
-          numPin_++;
+          std::cout << "Syntax error while reading Verilog." << std::endl;
+          exit(0);
         }
-      });
+  
+        int cellID = numInst_;
+  
+        std::string cellName = std::move(*(itr));
+  
+        dbCell cell(cellID, cellName, lefMacro);
+  
+        cell.setDx( static_cast<int>( lefMacro->sizeX() * dbUnit_ ) );
+        cell.setDy( static_cast<int>( lefMacro->sizeY() * dbUnit_ ) );
+  
+        strToCellID_[cellName] = cellID;
+  
+        std::string portName;
+        std::string netName;
+
+        itr = findParenthesePair(itr, end, [&] (auto& str) mutable { 
+          if(str == ")" || str == "(") 
+            return;
+          else if(str[0] == '.') 
+            portName = std::move( str.substr(1) );
+          else 
+          {
+            int netID;
+
+            netName = std::move( str );
+
+						if(netName != "1'b0" && netName != "1'b1")
+						{	
+							checkIfKeyExist(netName, strToNetID_, netID, "Net");
+  
+							int pinID = numPin_;
+  
+							if(portName[0] == '\\')
+								portName = portName.substr(1, portName.size() - 1);
+
+							std::string pinName = portName + ":" + cellName;
+
+							dbPin pin(pinID, cellID, netID, pinName, lefMacro->getPin(portName));
+
+							dbPinInsts_.push_back(pin);
+  
+							strToPinID_[pinName] = pinID;
+							numPin_++;
+						}
+						// TODO
+						// how to handle 1'b0?
+          }
+        });
+    
+        dbCellInsts_.push_back(cell);
+        numInst_++;
+      }
 
       if(itr == end) 
         std::cout << "Syntax error in gate pin-net mapping" << std::endl;
@@ -787,10 +926,8 @@ LefDefParser::readVerilog(const std::filesystem::path& path)
       if(*(++itr) != ";") 
         std::cout << "Missing ; in instance declaration" << std::endl;
 
-      dbCellInsts_.push_back(cell);
-      numInst_++;
 
-      if(numInst_ % 200000 == 0)
+      if(numInst_ % 200000 == 0 && numInst_ != 0)
       {
         using namespace std;
         cout << "  Read ";
