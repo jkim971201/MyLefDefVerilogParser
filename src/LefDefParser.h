@@ -19,7 +19,7 @@ enum MacroClass   {CORE, CORE_SPACER, PAD, BLOCK, ENDCAP};
 enum SiteClass    {CORE_SITE};
 enum PinDirection {INPUT, OUTPUT, INOUT};
 enum PinUsage     {SIGNAL, POWER, GROUND, CLOCK};
-enum Orient       {N, S, FN, FS};  // W E FW FE is not supported
+enum Orient       {N, S, E, FN, FS};  // W E FW FE is not supported
 
 struct LefRect
 {
@@ -319,87 +319,103 @@ class dbIO
     // If DEF is read first (before reading .v)
     // Use this constructor
     dbIO(int ioID, 
-         int origX,
-         int origY,
-         int offsetLx,  
-         int offsetLy,  
-         int offsetUx,  
-         int offsetUy,  
-         bool isFixed,
+				 int   lx,
+				 int   ly,
+				 int   dx,
+				 int   dy,
+         bool  isFixed,
          Orient orient,
          PinDirection direction,
          std::string& name) 
       : id_         (      ioID),
-        origX_      (     origX),
-        origY_      (     origY),
-        offsetLx_   (  offsetLx),
-        offsetLy_   (  offsetLy),
-        offsetUx_   (  offsetUx),
-        offsetUy_   (  offsetUy),
+        lx_         (        lx),
+        ly_         (        ly),
+        dx_         (        dx),
+        dy_         (        dy),
         orient_     (    orient),
         direction_  ( direction),
         ioName_     (      name) 
     {}
 
     // Getters
-    int           id() const { return id_;       }
-    int        origX() const { return origX_;    }
-    int        origY() const { return origY_;    }
-    int     offsetLx() const { return offsetLx_; }
-    int     offsetLy() const { return offsetLy_; }
-    int     offsetUx() const { return offsetUx_; }
-    int     offsetUy() const { return offsetUy_; }
-    bool     isFixed() const { return isFixed_;  }
+    int           id() const { return id_;            }
+    int           lx() const { return lx_;            }
+    int           ly() const { return ly_;            }
+    int           ux() const { return lx_ + dx_;      }
+    int           uy() const { return ly_ + dy_;      }
+    int           cx() const { return lx_ + dx_ / 2;  }
+    int           cy() const { return ly_ + dy_ / 2;  }
 
-    dbPin*       pin() const { return pin_;      }
-    std::string name() const { return ioName_;   }
+		int        origX() const { return origX_;         }
+		int        origY() const { return origY_;         }
+
+		int     offsetX1() const { return offsetX1_;      }
+		int     offsetY1() const { return offsetY1_;      }
+
+		int     offsetX2() const { return offsetX2_;      }
+		int     offsetY2() const { return offsetY2_;      }
+
+    bool     isFixed() const { return isFixed_;       }
+
+    dbPin*       pin() const { return pin_;           }
+    std::string name() const { return ioName_;        }
 
     Orient          orient() const { return orient_;    }
     PinDirection direction() const { return direction_; }
 
     // Setters
-    void setOrigX     (int     origX) { origX_    = origX;    }
-    void setOrigY     (int     origY) { origY_    = origY;    }
-    void setOffsetLx  (int  offsetLx) { offsetLx_ = offsetLx; }
-    void setOffsetLy  (int  offsetLy) { offsetLy_ = offsetLy; }
-    void setOffsetUx  (int  offsetUx) { offsetUx_ = offsetUx; }
-    void setOffsetUy  (int  offsetUy) { offsetUy_ = offsetUy; }
-
-    void setLocation(int origX, int origY, 
-                     int offsetLx, int offsetLy, 
-                     int offsetUx, int offsetUy)
+		void setDefInfo(int originX,  int originY, 
+				            int offsetX1, int offsetY1, 
+				            int offsetX2, int offsetY2) 
     {
-      origX_    = origX;
-      origY_    = origY;
-      offsetLx_ = offsetLx;
-      offsetLy_ = offsetLy;
-      offsetUx_ = offsetUx;
-      offsetUy_ = offsetUy;
+			origX_    = originX;
+			origX_    = originX;
 
-      pin_->setCx(origX);
-      pin_->setCy(origY);
+			offsetX1_ = offsetX1;
+			offsetY1_ = offsetY1;
 
-      pin_->setOffsetX( (offsetLx + offsetUx) / 2 );
-      pin_->setOffsetY( (offsetLy + offsetUy) / 2 );
+			offsetX2_ = offsetX2;
+			offsetY2_ = offsetY2;
     }
 
-    void setOrient    (Orient orient) { orient_   = orient;   }
-    void setFixed     (bool  isFixed) { isFixed_  = isFixed;  }
-    // These are written in DEF PINS
-    
+    void setLocation(int lx, int ly, int dx, int dy)
+    {
+			lx_ = lx;
+			ly_ = ly;
+
+			dx_ = dx;
+		  dy_ = dy;
+
+      pin_->setCx(lx + dx / 2);
+      pin_->setCy(ly + dy / 2);
+
+      pin_->setOffsetX(0);
+      pin_->setOffsetY(0);
+			// the location of dbPin of dbIO is just same as the center of dbIO
+			// (no specific reason...)
+    }
+
     void setPin       (dbPin* pin   ) { pin_      = pin;      }
+    void setOrient    (Orient orient) { orient_   = orient;   } // in DEF
+    void setFixed     (bool  isFixed) { isFixed_  = isFixed;  } // in DEF
 
   private:
 
     int id_;
+	
+		int lx_;
+		int ly_;
+
+		int dx_;
+		int dy_;
 
     int origX_;
     int origY_;
 
-    int offsetLx_;
-    int offsetLy_;
-    int offsetUx_;
-    int offsetUy_;
+    int offsetX1_;
+    int offsetY1_;
+    int offsetX2_;
+    int offsetY2_;
 
     bool isFixed_;
 
@@ -505,13 +521,15 @@ class dbRow
           int numSiteX, 
           int numSiteY,
           int stepX,
-          int stepY) 
+          int stepY,
+					Orient orient) 
       : origX_    ( origX    ),
         origY_    ( origY    ),
         numSiteX_ ( numSiteX ),
         numSiteY_ ( numSiteY ),
         stepX_    ( stepX    ),
-        stepY_    ( stepY    )
+        stepY_    ( stepY    ),
+				orient_   ( orient   )
     {
       sizeX_ =
         static_cast<int>( lefSite->sizeX() * numSiteX * dbUnit );
@@ -521,20 +539,22 @@ class dbRow
     }
 
     // Getters
-    std::string      name() const { return name_;    }
-    LefSite*      lefSite() const { return lefSite_; }
+    std::string    name() const { return name_;    }
+    LefSite*    lefSite() const { return lefSite_; }
 
-    int    origX() const { return origX_;    }
-    int    origY() const { return origY_;    }
+    int     origX() const { return origX_;    }
+    int     origY() const { return origY_;    }
 
-    int numSiteX() const { return numSiteX_; }
-    int numSiteY() const { return numSiteY_; }
+    int  numSiteX() const { return numSiteX_; }
+    int  numSiteY() const { return numSiteY_; }
 
-    int    stepX() const { return stepX_;    }
-    int    stepY() const { return stepY_;    }
+    int     stepX() const { return stepX_;    }
+    int     stepY() const { return stepY_;    }
 
-    int    sizeX() const { return sizeX_;    }
-    int    sizeY() const { return sizeY_;    }
+    int     sizeX() const { return sizeX_;    }
+    int     sizeY() const { return sizeY_;    }
+
+		Orient orient() const { return orient_;   }
 
   private:
 
@@ -552,6 +572,8 @@ class dbRow
 
     int sizeX_;
     int sizeY_;
+
+		Orient orient_;
 };
 
 class dbDie

@@ -785,7 +785,7 @@ LefDefParser::readVerilog(const std::filesystem::path& path)
       exit(0);
     }
     else
-      designName_ = *itr;
+      designName_ = std::move(*itr);
   }
 
   while(++itr != end && *itr != ";") 
@@ -814,18 +814,18 @@ LefDefParser::readVerilog(const std::filesystem::path& path)
       else if(*itr == "inout" )
         direction = PinDirection::INOUT;
 
+			// To handle [0:0] case...
+      bool isBus = false;
+      int numBus = 1;
+
+      if( isSqrBracket( *(itr + 1) ) )
+      {
+        isBus  = true;
+        numBus = getBusNumber( *(++itr) ) + 1;
+      }
+
       while(++itr != end && *itr != ";") 
       {
-        // To handle [0:0] case...
-        bool isBus = false;
-        int numBus = 1;
-
-        if( isSqrBracket( *itr ) )
-        {
-          isBus  = true;
-          numBus = getBusNumber( *(itr++) ) + 1;
-        }
-
         std::string baseName = std::move( *(itr) );
         std::string pinName  = baseName;
 
@@ -878,47 +878,55 @@ LefDefParser::readVerilog(const std::filesystem::path& path)
     }
     else if(*itr == "wire") 
     {
-      // To handle [0:0] case...
+			// To handle [0:0] case...
       bool isBus = false;
       int numBus = 1;
 
-      if( isSqrBracket( *(++itr) ) )
+      if( isSqrBracket( *(itr + 1) ) )
       {
         isBus  = true;
-        numBus = getBusNumber( *(itr++) ) + 1;
+        numBus = getBusNumber( *(++itr) ) + 1;
       }
 
-      std::string baseName = std::move( *(itr) );
-        
-      // wire xx[31:0];
-      // numBus   = 32
-      // baseName = xx
-      // netName  = baseName + i (i -> 0 ~ 31)
-      for(int curIdx = 0; curIdx < numBus; curIdx++)
-      {
-        int netID = numNet_;
-        std::string netName = baseName;
+      while( ++itr != end && *itr != ";")
+			{
+	      std::string baseName = std::move( *(itr) );
+	        
+	      // wire xx[31:0];
+	      // numBus   = 32
+	      // baseName = xx
+	      // netName  = baseName + i (i -> 0 ~ 31)
+	      for(int curIdx = 0; curIdx < numBus; curIdx++)
+	      {
+	        int netID = numNet_;
+	        std::string netName = baseName;
 
-        if(numBus > 1 || isBus)
-          netName = baseName + "[" + std::to_string(curIdx) + "]";
-
-        dbNet net(netID, netName);
-        dbNetInsts_.push_back(net);
-
-        strToNetID_[netName] = netID;
-
-        numNet_++;
-
-        if(numNet_ % 200000 == 0)
-        {
-          using namespace std;
-          cout << "  Read ";
-          cout << setw(7) << right << numNet_ << " Nets..." << endl;
-        }
-      }
-
-      while( *itr != ";" && itr != end)
-        itr++;
+					if( strToNetID_.find(netName) != strToNetID_.end() )
+						continue;
+					// If a netName exists already, then do not make new net instance.
+					// This is because of the weird syntax of verilog netlist.
+					// Sometimes there are cases that there is already "input netNameX;",
+					// but netNameX is redefiend again like "wire netNameX;"
+					// In this case, netNameX will be double-counted.
+	
+	        if(numBus > 1 || isBus)
+	          netName = baseName + "[" + std::to_string(curIdx) + "]";
+	
+	        dbNet net(netID, netName);
+	        dbNetInsts_.push_back(net);
+	
+	        strToNetID_[netName] = netID;
+	
+	        numNet_++;
+	
+	        if(numNet_ % 200000 == 0)
+	        {
+	          using namespace std;
+	          cout << "  Read ";
+	          cout << setw(7) << right << numNet_ << " Nets..." << endl;
+	        }
+	      }
+			}
     }
     else 
     {
@@ -1128,7 +1136,7 @@ LefDefParser::readDefRow(strIter& itr, const strIter& end)
   std::string rowName;
   std::string siteName;
 
-  std::string siteOrient;
+  std::string rowOrient;
 
   int origX = 0;
   int origY = 0;
@@ -1145,8 +1153,11 @@ LefDefParser::readDefRow(strIter& itr, const strIter& end)
   origX = std::stoi( *(++itr) );
   origY = std::stoi( *(++itr) );
 
-  siteOrient = std::move( *(++itr) );
+  rowOrient = std::move( *(++itr) );
 
+	// These stupid assert functions are
+	// just for temporary implementations...
+	// they will be replaced soon...
   assert( *(++itr) == "DO" );
 
   numSiteX = std::stoi( *(++itr) );
@@ -1161,21 +1172,24 @@ LefDefParser::readDefRow(strIter& itr, const strIter& end)
 
   stepY = std::stoi( *(++itr) );
 
+	assert( *(++itr) == ";" );
+
   LefSite* lefSite;
 
   checkIfKeyExist(siteName, siteMap_, lefSite, "LEF SITE");
 
-  if(siteOrient != "N")
+  if(rowOrient != "N" && rowOrient != "FS")
   {
-    std::cout << "[WARNING] Row Orient " << siteOrient;
+    std::cout << "[WARNING] Row Orient " << rowOrient;
     std::cout << " is not supported yet." << std::endl;
     std::cout << "[WARNING] Row Orient will be regarded as N." << std::endl;
+		rowOrient = Orient::N;
   }
 
   dbRow row(rowName, lefSite, dbUnit_,
             origX, origY, 
             numSiteX, numSiteY,
-            stepX, stepY);
+            stepX, stepY, strToOrient_[rowOrient]);
 
   dbRowInsts_.push_back(row);
 
@@ -1206,6 +1220,8 @@ LefDefParser::readDefDie(strIter& itr, const strIter& end)
     }
   }
 
+	assert( *(++itr) == ";" );
+
   if(itr == end)
   {
     std::cout << "Syntax Error in DEF." << std::endl;
@@ -1221,28 +1237,56 @@ LefDefParser::readDefOneComponent(strIter& itr, const strIter& end)
   std::string instName;
   std::string macroName;
 
-  std::string cellStatus;
+  std::string cellStatus = "UNPLACED";
 
   int lx = 0;
   int ly = 0;
+
+	int haloL = 0; // Halo Left 
+	int haloB = 0; // Halo Bottom
+	int haloR = 0; // Halo Right
+	int haloT = 0; // Halo Top
 
   std::string cellOrient;
 
   instName  = std::move( *(++itr) );
   macroName = std::move( *(++itr) );
 
-  assert( *(++itr) == "+" );
+	while( *(++itr) != ";" && itr != end)
+	{
+		if( *(itr) == "+" )
+		{
+			itr++;
+			if( *itr == "PLACED" || *itr == "FIXED")
+			{
+				cellStatus = std::move( *itr );
 
-  cellStatus = std::move( *(++itr) );
+				assert( *(++itr) == "(" );
+				lx = std::stoi( std::move( *(++itr) ) );
+				ly = std::stoi( std::move( *(++itr) ) );
+				assert( *(++itr) == ")" );
 
-  assert( *(++itr) == "(" );
-
-  lx = std::stoi( *(++itr));
-  ly = std::stoi( *(++itr));
-
-  assert( *(++itr) == ")" );
-
-  cellOrient = std::move( *(++itr) );
+				cellOrient = std::move( *(++itr) );
+			}
+			else if( *itr == "UNPLACED" )
+			{
+				// Do Nothing...
+			}
+			else if( *itr == "HALO" )
+			{
+				haloL = std::stoi( std::move( *(++itr) ) );
+				haloB = std::stoi( std::move( *(++itr) ) );
+				haloR = std::stoi( std::move( *(++itr) ) );
+				haloT = std::stoi( std::move( *(++itr) ) );
+			}
+			else if( *itr == "SOURCE" )
+			{
+				// Do Nothing...
+				// Maybe one of NETLIST / DIST / USER / TIMING
+				itr++; 
+			}
+		}
+	}
 
   bool isFixed = (cellStatus == "FIXED") ? true : false;
 
@@ -1259,7 +1303,7 @@ LefDefParser::readDefOneComponent(strIter& itr, const strIter& end)
   if(checkCell == strToCellID_.end())
   {
     // These components do not exist in the Verilog file
-    // but they do exist in the DEF file
+    // but they do exist in the DEF file (ICCAD 2015 superblue)
     // I don't know why...
     cellID = numInst_;
 
@@ -1283,27 +1327,28 @@ LefDefParser::readDefOneComponent(strIter& itr, const strIter& end)
     cell   = dbCellPtrs_[cellID];
   }
 
-  Orient orient;
-  auto orientCheck = strToOrient_.find(cellOrient);
+	if(cellStatus != "UNPLACED")
+	{
+		Orient orient;
+		auto orientCheck = strToOrient_.find(cellOrient);
 
-  checkIfKeyExist(cellOrient, strToOrient_, orient, "COMPONENT ORIENT");
+		if(orientCheck == strToOrient_.end())
+		{
+	    std::cout << "Error - COMPONENT ORIENT " << cellOrient;
+	    std::cout << " is not supported yet." << std::endl;
+	    exit(0);
+	  }
+	  else
+	    orient = orientCheck->second;
 
-  if(orientCheck == strToOrient_.end())
-  {
-    std::cout << "Error - ORIENT " << cellOrient;
-    std::cout << " is not supported yet." << std::endl;
-    exit(0);
-  }
-  else
-    orient = orientCheck->second;
+	  cell->setOrient(orient);
 
-  cell->setOrient(orient);
+	  cell->setLx(lx);
+	  cell->setLy(ly);
 
-  cell->setLx(lx);
-  cell->setLy(ly);
-
-  cell->setDx( static_cast<int>( lefMacro->sizeX() * dbUnit_ ) );
-  cell->setDy( static_cast<int>( lefMacro->sizeY() * dbUnit_ ) );
+	  cell->setDx( static_cast<int>( lefMacro->sizeX() * dbUnit_ ) );
+	  cell->setDy( static_cast<int>( lefMacro->sizeY() * dbUnit_ ) );
+	}
 
   numDefComps_++;
 
@@ -1319,6 +1364,8 @@ LefDefParser::readDefComponents(strIter& itr, const strIter& end)
 {
   int defComponents = std::stoi( std::move( *(++itr) ) );
 
+	assert( *(++itr) == ";" );
+
   while(++itr != end)
   {
     if(*itr == "-")
@@ -1327,6 +1374,7 @@ LefDefParser::readDefComponents(strIter& itr, const strIter& end)
       break;
     else
     {
+			std::cout << *itr << std::endl;
       std::cout << "Syntax Error while Reading DEF COMPONENTS" << std::endl;
       exit(0);
     }
@@ -1344,11 +1392,11 @@ LefDefParser::readDefOnePin(strIter& itr, const strIter& end)
   std::string pinOrient;
   std::string pinLayer;
 
-  int offsetLx = 0;
-  int offsetLy = 0;
+  int offsetX1 = 0;
+  int offsetY1 = 0;
 
-  int offsetUx = 0;
-  int offsetUy = 0;
+  int offsetX2 = 0;
+  int offsetY2 = 0;
 
   int originX = 0;
   int originY = 0;
@@ -1387,17 +1435,17 @@ LefDefParser::readDefOnePin(strIter& itr, const strIter& end)
 
       assert(*(++itr) == "(");
 
-      offsetLx = std::stoi( *(++itr) );
+      offsetX1 = std::stoi( *(++itr) );
 
-      offsetLy = std::stoi( *(++itr) );
+      offsetY1 = std::stoi( *(++itr) );
 
       assert(*(++itr) == ")");
 
       assert(*(++itr) == "(");
 
-      offsetUx = std::stoi( *(++itr) );
+      offsetX2 = std::stoi( *(++itr) );
 
-      offsetUy = std::stoi( *(++itr) );
+      offsetY2 = std::stoi( *(++itr) );
 
       assert(*(++itr) == ")");
     }
@@ -1412,12 +1460,54 @@ LefDefParser::readDefOnePin(strIter& itr, const strIter& end)
 
   Orient orient = strToOrient_[pinOrient];
 
-  if(orient != Orient::N)
+  if(orient != Orient::N && orient != Orient::E)
   {
-    std::cout << "[WARNING] Orient " << pinOrient;
+    std::cout << "[WARNING] Pin Orient " << pinOrient;
     std::cout << " is not supported yet." << std::endl;
-    std::cout << "[WARNING] Orient will be regarded as N." << std::endl;
+    std::cout << "[WARNING] Pin Orient will be regarded as N." << std::endl;
+		orient = Orient::N;
   }
+
+	int lx = 0;
+	int ly = 0;
+	int dx = 0;
+	int dy = 0;
+
+	// origin is always the center of the lowest side
+	// -----
+	// |   |
+	// |   |
+	// -----
+	//   O
+
+	//        O:  Orient 
+	// E
+	//   -------
+	// O |     |
+	//   -------
+	
+	// -----
+	// |   |
+	// |   |
+	// -----
+	// N O
+
+	if(orient == Orient::N)
+	{
+		dx = offsetX2 - offsetX1;
+		dy = offsetY2 - offsetY1;
+
+		lx = originX - dx / 2;
+		ly = originY;
+	}
+	else if(orient == Orient::E)
+	{
+		dx = offsetY2 - offsetY1;
+		dy = offsetX2 - offsetY2;
+
+		lx = originX;
+		ly = originY - dy / 2;
+	}
 
   bool ifKeyExist;
   checkIfKeyExist(pinName, strToIOID_, ioID, "PIN", ifKeyExist);
@@ -1437,7 +1527,8 @@ LefDefParser::readDefOnePin(strIter& itr, const strIter& end)
   {
     dbIO* io = dbIOPtrs_[ioID];
     //assert(io->pin()->net()->name() == netName);
-    io->setLocation(originX, originY, offsetLx, offsetLy, offsetUx, offsetUy);
+    io->setDefInfo(originX, originY, offsetX1, offsetY1, offsetX2, offsetY2);
+    io->setLocation(lx, ly, dx, dy);
     io->setOrient(orient);
   }
 }
@@ -1446,6 +1537,8 @@ void
 LefDefParser::readDefPins(strIter& itr, const strIter& end)
 {
   int numDefPins = std::stoi( *(++itr) );
+
+	assert( *(++itr) == ";" );
 
   while(++itr != end)
   {
@@ -1473,7 +1566,7 @@ LefDefParser::readDef(const std::filesystem::path& fileName)
     exit(0);
   }
 
-  static std::string_view delimiters = "#;";
+  static std::string_view delimiters = "#";
   static std::string_view exceptions = "";
   
   auto tokens = tokenize(fileName, delimiters, exceptions);
@@ -1516,14 +1609,23 @@ LefDefParser::readDef(const std::filesystem::path& fileName)
   int coreUx = INT_MIN;
   int coreUy = INT_MIN;
 
-  // Assume the orient of row is always N
+	int lx, ly, ux, uy = 0;
+
   for(auto& r : dbRowInsts_)
   {
-    int lx = r.origX();
-    int ly = r.origY();
+    lx = r.origX();
+    ux = lx + r.sizeX();
 
-    int ux = lx + r.sizeX();
-    int uy = ly + r.sizeY();
+		if(r.orient() == Orient::N)
+		{
+			ly = r.origY();
+			uy = ly + r.sizeY();
+		}
+		if(r.orient() == Orient::FS)
+		{
+			uy = r.origY();
+			ly = ly + r.sizeY();
+		}
 
     if(lx < coreLx)
       coreLx = lx;
