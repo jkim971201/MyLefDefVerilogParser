@@ -72,22 +72,19 @@ auto findParenthesePair(const I start, const I end, C&& c)
   if(left == end || right == end) 
     return end;
   else
-	{
+  {
     for(++left; left != right; ++left) 
-		{ 
-			if( isSqrBracket( *(left + 1) ) )
-			{
-				std::cout << "*left     " << *left << std::endl;
-				std::cout << "*left + 1 " << *(left + 1) << std::endl;
-				std::string tempStr = *left + *(left + 1);
-				c(tempStr);
-				left++;
-			}
-			else
-				c(*left); 
-		}
-	}
-
+    { 
+      if( isSqrBracket( *(left + 1) ) )
+      {
+        std::string tempStr = *left + *(left + 1);
+        c(tempStr, left);
+        left++;
+      }
+      else
+        c(*left, left); 
+    }
+  }
   return right;
 }
 
@@ -679,8 +676,9 @@ LefDefParser::readVerilog(const std::filesystem::path& path)
   }
 
   // static std::string_view delimiters = "(),:;/#[]{}*\"\\";
+  // static std::string_view exceptions = "().;";
   static std::string_view delimiters = "(),;#{}*";
-  static std::string_view exceptions = "().;";
+  static std::string_view exceptions = "().;{}";
   
   auto tokens = tokenize(path, delimiters, exceptions);
 
@@ -734,15 +732,15 @@ LefDefParser::readVerilog(const std::filesystem::path& path)
 
       while(++itr != end && *itr != ";") 
       {
-				// To handle [0:0] case...
-				bool isBus = false;
+        // To handle [0:0] case...
+        bool isBus = false;
         int numBus = 1;
 
         if( isSqrBracket( *itr ) )
-				{
-					isBus  = true;
+        {
+          isBus  = true;
           numBus = getBusNumber( *(itr++) ) + 1;
-				}
+        }
 
         std::string baseName = std::move( *(itr) );
         std::string pinName  = baseName;
@@ -796,15 +794,15 @@ LefDefParser::readVerilog(const std::filesystem::path& path)
     }
     else if(*itr == "wire") 
     {
-			// To handle [0:0] case...
-			bool isBus = false;
+      // To handle [0:0] case...
+      bool isBus = false;
       int numBus = 1;
 
       if( isSqrBracket( *(++itr) ) )
-			{
-				isBus  = true;
+      {
+        isBus  = true;
         numBus = getBusNumber( *(itr++) ) + 1;
-			}
+      }
 
       std::string baseName = std::move( *(itr) );
         
@@ -817,8 +815,8 @@ LefDefParser::readVerilog(const std::filesystem::path& path)
         int netID = numNet_;
         std::string netName = baseName;
 
-				if(numBus > 1 || isBus)
-					netName = baseName + "[" + std::to_string(curIdx) + "]";
+        if(numBus > 1 || isBus)
+          netName = baseName + "[" + std::to_string(curIdx) + "]";
 
         dbNet net(netID, netName);
         dbNetInsts_.push_back(net);
@@ -835,21 +833,21 @@ LefDefParser::readVerilog(const std::filesystem::path& path)
         }
       }
 
-			while( *itr != ";" && itr != end)
-				itr++;
+      while( *itr != ";" && itr != end)
+        itr++;
     }
     else 
     {
       std::string macroName = std::move(*itr);
 
-			// TODO
-			// how to handle "assign"?
+      // TODO
+      // how to handle "assign"?
       if(macroName == "assign")
       {
         std::string netName = std::string( *(++itr) );
 
-				while( *(itr + 1) != ";" && itr != end)
-					itr++;
+        while( *(itr + 1) != ";" && itr != end)
+          itr++;
       }
       else
       {
@@ -882,37 +880,83 @@ LefDefParser::readVerilog(const std::filesystem::path& path)
         std::string portName;
         std::string netName;
 
-        itr = findParenthesePair(itr, end, [&] (auto& str) mutable { 
+        itr = findParenthesePair(itr, end, [&] (const std::string& str, strIter& iter) mutable { 
           if(str == ")" || str == "(") 
             return;
           else if(str[0] == '.') 
             portName = std::move( str.substr(1) );
           else 
           {
-            int netID;
+            // TODO
+            // how to handle 1'b0?
+            if(str == "1'b0" || str == "1'b1")
+            {
+              // Connect to Power / Ground
+            }
+            else if(str == "{")
+            {
+              int numBus = 0;
+							std::vector<strIter> strItrVec;
 
-            netName = std::move( str );
+							iter++;
+								
+							while( *(iter + 1) != "}" )
+							{
+								strItrVec.push_back( ++iter );
+								numBus++;
+							}
 
-						if(netName != "1'b0" && netName != "1'b1")
-						{	
-							checkIfKeyExist(netName, strToNetID_, netID, "Net");
+							// At this moment, *(iter + 1) == "}"
+							// to skip this bracket,
+							// we have to do iter++ one more time
+							iter++;
+
+							int curID = numBus - 1;
+							for(auto& sIter : strItrVec)
+							{
+								int netID;
+								std::string portNameWithID = portName + "[" + std::to_string(curID) + "]";
+								netName = std::move(*sIter);
+
+								// TODO
+								// how to handle 1'b0?
+								if(netName == "1'b0" || netName == "1'b1")
+									continue;
+
+		 				    checkIfKeyExist(netName, strToNetID_, netID, "Net");
   
-							int pinID = numPin_;
+	              int pinID = numPin_;
+
+								std::string pinName = portNameWithID + ":" + cellName;
+
+								dbPin pin(pinID, cellID, netID, pinName, lefMacro->getPin(portNameWithID));
+
+								dbPinInsts_.push_back(pin);
   
-							if(portName[0] == '\\')
-								portName = portName.substr(1, portName.size() - 1);
+								strToPinID_[pinName] = pinID;
 
-							std::string pinName = portName + ":" + cellName;
+								numPin_++;
+								curID--;
+							}
+            }
+            else
+            {  
+              int netID;
+              netName = std::move( str );
 
-							dbPin pin(pinID, cellID, netID, pinName, lefMacro->getPin(portName));
-
-							dbPinInsts_.push_back(pin);
+              checkIfKeyExist(netName, strToNetID_, netID, "Net");
   
-							strToPinID_[pinName] = pinID;
-							numPin_++;
-						}
-						// TODO
-						// how to handle 1'b0?
+              int pinID = numPin_;
+  
+              std::string pinName = portName + ":" + cellName;
+
+              dbPin pin(pinID, cellID, netID, pinName, lefMacro->getPin(portName));
+
+              dbPinInsts_.push_back(pin);
+  
+              strToPinID_[pinName] = pinID;
+              numPin_++;
+            }
           }
         });
     
