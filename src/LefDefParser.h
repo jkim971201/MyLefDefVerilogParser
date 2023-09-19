@@ -346,6 +346,9 @@ class dbIO
     int           cx() const { return lx_ + dx_ / 2;  }
     int           cy() const { return ly_ + dy_ / 2;  }
 
+		int64_t     area() const { return static_cast<int64_t>(dx_) 
+			                              * static_cast<int64_t>(dy_); }
+
 		int        origX() const { return origX_;         }
 		int        origY() const { return origY_;         }
 
@@ -733,8 +736,8 @@ class LefDefParser
     int64_t sumStdCellArea_;                                                   // Sum of cell area
     int64_t sumMacroArea_;                                                     // Sum of macro block area
 
-    float util_;                                                               // TotalInstArea / DieArea
-    float density_;                                                            // MovableArea / (DieArea - FixedArea)
+    float density_;                                                            // TotalInstArea / DieArea
+    float util_;                                                               //   MovableArea / (DieArea - FixedArea)
 																																							 // e.g. MovableArea = StdCellArea
 																																							 //      FixedArea   = MacroArea
 

@@ -1621,7 +1621,7 @@ LefDefParser::readDef(const std::filesystem::path& fileName)
 			ly = r.origY();
 			uy = ly + r.sizeY();
 		}
-		if(r.orient() == Orient::FS)
+		else if(r.orient() == Orient::FS)
 		{
 			uy = r.origY();
 			ly = ly + r.sizeY();
@@ -1643,24 +1643,33 @@ LefDefParser::readDef(const std::filesystem::path& fileName)
 
   for(auto& cell : dbCellPtrs_)
   {
-    int64_t area = static_cast<int64_t>( cell->area() );
+    int64_t area = cell->area();
 
     sumTotalInstArea_ += area;
 
     if(cell->isMacro())
       sumMacroArea_ += area;
 
-    if(cell->isStdCell())
+    if(cell->isStdCell() || cell->isDummy())
       sumStdCellArea_ += area;
   }
 
+	// ioArea will be counted for FixedArea
+	int64_t ioArea = 0;
+
+	for(auto & io : dbIOPtrs_)
+	{
+		int64_t area = io->area();
+		ioArea += area;
+	}
+
   int64_t coreArea = die_.coreArea();
 
-  util_    = static_cast<float>( sumTotalInstArea_) 
+  density_ = static_cast<float>( sumTotalInstArea_ + ioArea)
            / static_cast<float>( coreArea );
 
-  density_ = static_cast<float>( sumStdCellArea_ )
-           / static_cast<float>( coreArea - sumMacroArea_ );
+  util_    = static_cast<float>( sumStdCellArea_ )
+           / static_cast<float>( coreArea - sumMacroArea_ - ioArea);
 
   ifReadDef_ = true;
 }
