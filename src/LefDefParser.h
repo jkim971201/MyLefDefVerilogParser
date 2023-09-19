@@ -3,6 +3,7 @@
 #include <iostream>
 #include <memory>
 #include <vector>
+#include <set>
 #include <unordered_map>
 #include <string>
 #include <filesystem>
@@ -50,10 +51,10 @@ class LefPin
     {}
 
     // Setters
-    void setPinUsage    (PinUsage     pinUsage) { pinUsage_ = pinUsage; }
-    void setPinDirection(PinDirection pinDir  ) { pinDir_   = pinDir;   }
+    void setPinUsage    (PinUsage     pinUsage) { pinUsage_ = pinUsage;     }
+    void setPinDirection(PinDirection pinDir  ) { pinDir_   = pinDir;       }
 
-    void addLefRect(LefRect rect) { lefRect_.push_back(rect); }
+    void addLefRect     (LefRect      rect    ) { lefRect_.push_back(rect); }
 
     // Getters
     float                 lx() const { return lx_;         }
@@ -434,16 +435,16 @@ class dbCell
     }
 
     // Setters
-    void setName       (std::string& name   ) { cellName_   = name;       }
+    void setName       (std::string&  name  ) { cellName_   = name;       }
     void setLefMacro   (LefMacro* lefMacro  ) { lefMacro_   = lefMacro;   }
-    void setOrient     (Orient cellOrient   ) { cellOrient_ = cellOrient; }
-    void setFixed      (bool isFixed        ) { isFixed_    = isFixed;    }
-    void setDummy      (bool isDummy        ) { isDummy_    = isDummy;    }
-    void setLx         (int lx              ) { lx_         = lx;         }
-    void setLy         (int ly              ) { ly_         = ly;         }
-    void setDx         (int dx              ) { dx_         = dx;         }
-    void setDy         (int dy              ) { dy_         = dy;         }
-    void addPin        (dbPin* pin          ) { pins_.push_back(pin);     }
+    void setOrient     (Orient  cellOrient  ) { cellOrient_ = cellOrient; }
+    void setFixed      (bool       isFixed  ) { isFixed_    = isFixed;    }
+    void setDummy      (bool       isDummy  ) { isDummy_    = isDummy;    }
+    void setLx         (int             lx  ) { lx_         = lx;         }
+    void setLy         (int             ly  ) { ly_         = ly;         }
+    void setDx         (int             dx  ) { dx_         = dx;         }
+    void setDy         (int             dy  ) { dy_         = dy;         }
+    void addPin        (dbPin*         pin  ) { pins_.push_back(pin);     }
 
     // Getters
     std::string     name()  const { return cellName_;   }
@@ -636,9 +637,11 @@ class LefDefParser
                                             std::string_view dels,             // Delimiters
                                             std::string_view exps);            // Exceptions
 
-    bool ifReadLef_;
-    bool ifReadVerilog_;
-    bool ifReadDef_;
+    bool ifReadLef_;                                                           // LEF     Flag
+    bool ifReadVerilog_;                                                       // Verilog Flag
+    bool ifReadDef_;                                                           // DEF     Flag
+
+		void reset();                                                              // Reset Function (clear or initialize all db)
 
     // LEF-related
     int dbUnit_;                                                               // LEF DATABASE MICRONS
@@ -664,6 +667,8 @@ class LefDefParser
     std::unordered_map<std::string, PinUsage>     strToPinUsage_;              // String - enum PIN_USAGE     Table
     std::unordered_map<std::string, Orient>       strToOrient_;                // String - enum ORIENT        Table
 
+		std::set<std::string>                         lefList_;                    // Set of LEF File name that already read
+
     // Verilog-related
     std::string designName_;                                                   // Top Module name
 
@@ -676,50 +681,52 @@ class LefDefParser
     int numNet_;                                                               // Number of Nets
     int numPin_;                                                               // Number of Pins
     int numDummy_;                                                             // Number of Dummy Cells
-    // In the ICCAD 2015 supberblue benchmarks, 
+    // In the ICCAD 2015 superblue benchmarks, 
     // there are some cells that exist in DEF
     // but not in the Verilog,
     // We will call them "Dummy Cells".
 
-    std::vector<dbCell*> dbCellPtrs_;
-    std::vector<dbCell>  dbCellInsts_;
+    std::vector<dbCell*> dbCellPtrs_;                                          // List of dbCell Pointer
+    std::vector<dbCell>  dbCellInsts_;                                         // List of dbCell Instance
 
-    std::vector<dbPin*>  dbPinPtrs_;
-    std::vector<dbPin>   dbPinInsts_;
+    std::vector<dbPin*>  dbPinPtrs_;                                           // List of dbPin Pointer
+    std::vector<dbPin>   dbPinInsts_;                                          // List of dbPin Instance
 
-    std::vector<dbIO*>   dbIOPtrs_;
-    std::vector<dbIO>    dbIOInsts_;
+    std::vector<dbIO*>   dbIOPtrs_;                                            // List of dbIO Pointer
+    std::vector<dbIO>    dbIOInsts_;                                           // List of dbIO Instance
 
-    std::vector<dbNet*>  dbNetPtrs_;
-    std::vector<dbNet>   dbNetInsts_;
+    std::vector<dbNet*>  dbNetPtrs_;                                           // List of dbNet Pointer
+    std::vector<dbNet>   dbNetInsts_;                                          // List of dbNet Instance
 
-    std::unordered_map<std::string, int> strToCellID_;
-    std::unordered_map<std::string, int> strToNetID_;
-    std::unordered_map<std::string, int> strToPinID_;
-    std::unordered_map<std::string, int> strToIOID_;
+    std::unordered_map<std::string, int> strToCellID_;                         // CellName - CellID Table
+    std::unordered_map<std::string, int> strToNetID_;                          //  NetName -  NetID Table
+    std::unordered_map<std::string, int> strToPinID_;                          //  PinName -  PinID Table
+    std::unordered_map<std::string, int> strToIOID_;                           //   IOName -   IOID Table
 
     // DEF-related
-    int numRow_;
-    int numDefComps_;
+    int numRow_;                                                               // Number of ROWS       in DEF
+    int numDefComps_;                                                          // Number of COMPONENTS in DEF
 
-    int64_t sumTotalInstArea_;
-    int64_t sumStdCellArea_;
-    int64_t sumMacroArea_;
+    int64_t sumTotalInstArea_;                                                 // Sum of Total instance area (StdCell + Macro)
+    int64_t sumStdCellArea_;                                                   // Sum of cell area
+    int64_t sumMacroArea_;                                                     // Sum of macro block area
 
-    float util_;
-    float density_;
+    float util_;                                                               // TotalInstArea / DieArea
+    float density_;                                                            // MovableArea / (DieArea - FixedArea)
+																																							 // e.g. MovableArea = StdCellArea
+																																							 //      FixedArea   = MacroArea
 
-    dbDie die_;
+    dbDie die_;                                                                // Instance of dbDie
 
-    std::vector<dbRow>   dbRowInsts_;
-    std::vector<dbRow*>  dbRowPtrs_;
+    std::vector<dbRow*>  dbRowPtrs_;                                           // List of Row Pointers
+    std::vector<dbRow>   dbRowInsts_;                                          // List of Row Instances
 
-    void readDefDie          (strIter& itr, const strIter& end);
-    void readDefRow          (strIter& itr, const strIter& end);
-    void readDefOnePin       (strIter& itr, const strIter& end);
-    void readDefPins         (strIter& itr, const strIter& end);
-    void readDefOneComponent (strIter& itr, const strIter& end);
-    void readDefComponents   (strIter& itr, const strIter& end);
+    void readDefDie          (strIter& itr, const strIter& end);               // Read One DEF DIE
+    void readDefRow          (strIter& itr, const strIter& end);               // Read One DEF ROW
+    void readDefOnePin       (strIter& itr, const strIter& end);               // Read One DEF PIN
+    void readDefPins         (strIter& itr, const strIter& end);               // Read DEF PINS
+    void readDefOneComponent (strIter& itr, const strIter& end);               // Read One DEF COMPONENT
+    void readDefComponents   (strIter& itr, const strIter& end);               // Read DEF COMPONENTS
 };
 
 };

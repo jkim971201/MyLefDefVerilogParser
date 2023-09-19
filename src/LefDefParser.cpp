@@ -300,25 +300,35 @@ LefDefParser::tokenize(const std::filesystem::path& path,
 }
 
 LefDefParser::LefDefParser()
-  : numPI_             (    0),
+  : // LEF-related
+    dbUnit_            ( 1000),
+
+		// Verilog-related
+		numPI_             (    0),
     numPO_             (    0),
     numIO_             (    0),
     numInst_           (    0),
     numNet_            (    0),
     numPin_            (    0),
-    numRow_            (    0),
     numStdCell_        (    0),
-    numDummy_          (    0),
     numMacro_          (    0),
+
+		// DEF-related
+    numRow_            (    0),
+    numDummy_          (    0),
     numDefComps_       (    0),
-    dbUnit_            ( 1000),
     sumTotalInstArea_  (    0),
     sumStdCellArea_    (    0),
     sumMacroArea_      (    0),
+		util_              (  0.0),
+		density_           (  0.0),
+
     ifReadLef_         (false),
     ifReadVerilog_     (false),
     ifReadDef_         (false)
 {
+	reset();
+
   strToMacroClass_["CORE"       ] = MacroClass::CORE;
   strToMacroClass_["CORE_SPACER"] = MacroClass::CORE_SPACER;
   strToMacroClass_["PAD"        ] = MacroClass::PAD;
@@ -326,6 +336,7 @@ LefDefParser::LefDefParser()
   strToMacroClass_["ENDCAP"     ] = MacroClass::ENDCAP;
   
   strToSiteClass_["CORE"] = SiteClass::CORE_SITE;
+  strToSiteClass_["core"] = SiteClass::CORE_SITE;
 
   strToPinDirection_["INPUT" ] = PinDirection::INPUT;
   strToPinDirection_["OUTPUT"] = PinDirection::OUTPUT;
@@ -340,6 +351,72 @@ LefDefParser::LefDefParser()
   strToOrient_["S" ] = Orient::S;
   strToOrient_["FN"] = Orient::FN;
   strToOrient_["FS"] = Orient::FS;
+}
+
+void
+LefDefParser::reset()
+{
+	// LEF-related
+	dbUnit_ = 1000;
+
+	macros_.clear();
+	sites_.clear();
+
+	macroMap_.clear();
+	siteMap_.clear();
+	
+	strToMacroClass_.clear();
+	strToSiteClass_.clear();
+	strToPinUsage_.clear();
+	strToPinDirection_.clear();
+	strToPinUsage_.clear();
+	strToOrient_.clear();
+
+	lefList_.clear();
+
+	// Verilog-related
+	designName_.clear();
+	
+	numPI_       = 0;
+	numPO_       = 0;
+	numIO_       = 0;
+	numInst_     = 0;
+	numStdCell_  = 0;
+	numMacro_    = 0;
+	numNet_      = 0;
+	numPin_      = 0;
+	numDummy_    = 0;
+
+	dbCellPtrs_.clear();
+	dbCellInsts_.clear();
+
+	dbPinPtrs_.clear();
+	dbPinInsts_.clear();
+
+	dbIOPtrs_.clear();
+	dbIOInsts_.clear();
+
+	dbNetPtrs_.clear();
+	dbNetInsts_.clear();
+
+	strToCellID_.clear();
+	strToNetID_.clear();
+	strToPinID_.clear();
+	strToIOID_.clear();
+
+	// DEF-related
+	numRow_           = 0;
+	numDefComps_      = 0;
+
+	sumTotalInstArea_ = 0;
+	sumStdCellArea_   = 0;
+	sumMacroArea_     = 0;
+
+	util_             = 0.0;
+	density_          = 0.0;
+
+	dbRowInsts_.clear();
+	dbRowPtrs_.clear();
 }
 
 void 
@@ -615,7 +692,14 @@ LefDefParser::readLefUnit(strIter& itr, const strIter& end)
 void 
 LefDefParser::readLef(const std::filesystem::path& fileName)
 {
-  std::cout << "Read " << std::string(fileName) << std::endl;
+	std::string filenameStr = std::string(fileName);
+
+	if(lefList_.count(filenameStr))
+		return;
+
+	lefList_.insert(filenameStr);
+
+  std::cout << "Read " << filenameStr << std::endl;
 
   static std::string_view delimiters = "#;";
   static std::string_view exceptions = "";
