@@ -37,17 +37,17 @@ inline void getBusNumber(const std::string& str, int& numBus, int& offset)
   if(begin == end)
   {
     std::cout << "Bus syntax error..." << std::endl;
-		std::cout << str << std::endl;
+    std::cout << str << std::endl;
     exit(0);
   }
 
   auto nuRegItr = std::sregex_iterator( str.begin() + 1, str.end() - 1, nu);
-	
-	int bit1 = std::stoi( nuRegItr->str() );
-	int bit2 = std::stoi( (++nuRegItr)->str() );
+  
+  int bit1 = std::stoi( nuRegItr->str() );
+  int bit2 = std::stoi( (++nuRegItr)->str() );
 
-	numBus = bit1 - bit2 + 1;
-	offset = bit2;
+  numBus = bit1 - bit2 + 1;
+  offset = bit2;
 }
 
 // Iteratively apply closure c on each token inside the parentheses pair
@@ -307,8 +307,8 @@ LefDefParser::LefDefParser()
   : // LEF-related
     dbUnit_            ( 1000),
 
-		// Verilog-related
-		numPI_             (    0),
+    // Verilog-related
+    numPI_             (    0),
     numPO_             (    0),
     numIO_             (    0),
     numInst_           (    0),
@@ -317,21 +317,21 @@ LefDefParser::LefDefParser()
     numStdCell_        (    0),
     numMacro_          (    0),
 
-		// DEF-related
+    // DEF-related
     numRow_            (    0),
     numDummy_          (    0),
     numDefComps_       (    0),
     sumTotalInstArea_  (    0),
     sumStdCellArea_    (    0),
     sumMacroArea_      (    0),
-		util_              (  0.0),
-		density_           (  0.0),
+    util_              (  0.0),
+    density_           (  0.0),
 
     ifReadLef_         (false),
     ifReadVerilog_     (false),
     ifReadDef_         (false)
 {
-	reset();
+  reset();
 
   strToMacroClass_["CORE"       ] = MacroClass::CORE;
   strToMacroClass_["CORE_SPACER"] = MacroClass::CORE_SPACER;
@@ -360,67 +360,67 @@ LefDefParser::LefDefParser()
 void
 LefDefParser::reset()
 {
-	// LEF-related
-	dbUnit_ = 1000;
+  // LEF-related
+  dbUnit_ = 1000;
 
-	macros_.clear();
-	sites_.clear();
+  macros_.clear();
+  sites_.clear();
 
-	macroMap_.clear();
-	siteMap_.clear();
-	
-	strToMacroClass_.clear();
-	strToSiteClass_.clear();
-	strToPinUsage_.clear();
-	strToPinDirection_.clear();
-	strToPinUsage_.clear();
-	strToOrient_.clear();
+  macroMap_.clear();
+  siteMap_.clear();
+  
+  strToMacroClass_.clear();
+  strToSiteClass_.clear();
+  strToPinUsage_.clear();
+  strToPinDirection_.clear();
+  strToPinUsage_.clear();
+  strToOrient_.clear();
 
-	lefList_.clear();
+  lefList_.clear();
 
-	// Verilog-related
-	designName_.clear();
-	
-	numPI_       = 0;
-	numPO_       = 0;
-	numIO_       = 0;
-	numInst_     = 0;
-	numStdCell_  = 0;
-	numMacro_    = 0;
-	numNet_      = 0;
-	numPin_      = 0;
-	numDummy_    = 0;
+  // Verilog-related
+  designName_.clear();
+  
+  numPI_       = 0;
+  numPO_       = 0;
+  numIO_       = 0;
+  numInst_     = 0;
+  numStdCell_  = 0;
+  numMacro_    = 0;
+  numNet_      = 0;
+  numPin_      = 0;
+  numDummy_    = 0;
 
-	dbCellPtrs_.clear();
-	dbCellInsts_.clear();
+  dbCellPtrs_.clear();
+  dbCellInsts_.clear();
 
-	dbPinPtrs_.clear();
-	dbPinInsts_.clear();
+  dbPinPtrs_.clear();
+  dbPinInsts_.clear();
 
-	dbIOPtrs_.clear();
-	dbIOInsts_.clear();
+  dbIOPtrs_.clear();
+  dbIOInsts_.clear();
 
-	dbNetPtrs_.clear();
-	dbNetInsts_.clear();
+  dbNetPtrs_.clear();
+  dbNetInsts_.clear();
 
-	strToCellID_.clear();
-	strToNetID_.clear();
-	strToPinID_.clear();
-	strToIOID_.clear();
+  strToCellID_.clear();
+  strToNetID_.clear();
+  strToPinID_.clear();
+  strToIOID_.clear();
 
-	// DEF-related
-	numRow_           = 0;
-	numDefComps_      = 0;
+  // DEF-related
+  numRow_           = 0;
+  numDefComps_      = 0;
 
-	sumTotalInstArea_ = 0;
-	sumStdCellArea_   = 0;
-	sumMacroArea_     = 0;
+  sumTotalInstArea_ = 0;
+  sumStdCellArea_   = 0;
+  sumMacroArea_     = 0;
 
-	util_             = 0.0;
-	density_          = 0.0;
+  util_             = 0.0;
+  density_          = 0.0;
 
-	dbRowInsts_.clear();
-	dbRowPtrs_.clear();
+  dbRowInsts_.clear();
+  dbRowPtrs_.clear();
 }
 
 void 
@@ -696,12 +696,12 @@ LefDefParser::readLefUnit(strIter& itr, const strIter& end)
 void 
 LefDefParser::readLef(const std::filesystem::path& fileName)
 {
-	std::string filenameStr = std::string(fileName);
+  std::string filenameStr = std::string(fileName);
 
-	if(lefList_.count(filenameStr))
-		return;
+  if(lefList_.count(filenameStr))
+    return;
 
-	lefList_.insert(filenameStr);
+  lefList_.insert(filenameStr);
 
   std::cout << "Read " << filenameStr << std::endl;
 
@@ -818,10 +818,10 @@ LefDefParser::readVerilog(const std::filesystem::path& path)
       else if(*itr == "inout" )
         direction = PinDirection::INOUT;
 
-			// To handle [0:0] case...
+      // To handle [0:0] case...
       bool isBus = false;
       int numBus = 1;
-			int offset = 0;
+      int offset = 0;
 
       if( isSqrBracket( *(itr + 1) ) )
       {
@@ -839,7 +839,7 @@ LefDefParser::readVerilog(const std::filesystem::path& path)
 
         // input xx[31:16];
         // numBus   = 16
-				// offset   = 16
+        // offset   = 16
         // baseName = xx
         // pinName  = baseName + i (i -> 16 ~ 31)
         for(int curIdx = 0; curIdx < numBus; curIdx++)
@@ -884,10 +884,10 @@ LefDefParser::readVerilog(const std::filesystem::path& path)
     }
     else if(*itr == "wire") 
     {
-			// To handle [0:0] case...
+      // To handle [0:0] case...
       bool isBus = false;
       int numBus = 1;
-			int offset = 0;
+      int offset = 0;
 
       if( isSqrBracket( *(itr + 1) ) )
       {
@@ -896,45 +896,45 @@ LefDefParser::readVerilog(const std::filesystem::path& path)
       }
 
       while( ++itr != end && *itr != ";")
-			{
-	      std::string baseName = std::move( *(itr) );
-	        
-	      // wire xx[31:16];
+      {
+        std::string baseName = std::move( *(itr) );
+          
+        // wire xx[31:16];
         // numBus   = 16
-				// offset   = 16
+        // offset   = 16
         // baseName = xx
         // pinName  = baseName + i (i -> 16 ~ 31)
-	      for(int curIdx = 0; curIdx < numBus; curIdx++)
-	      {
-	        int netID = numNet_;
-	        std::string netName = baseName;
+        for(int curIdx = 0; curIdx < numBus; curIdx++)
+        {
+          int netID = numNet_;
+          std::string netName = baseName;
 
-					if( strToNetID_.find(netName) != strToNetID_.end() )
-						continue;
-					// If a netName exists already, then do not make new net instance.
-					// This is because of the weird syntax of verilog netlist.
-					// Sometimes there are cases that there is already "input netNameX;",
-					// but netNameX is redefiend again like "wire netNameX;"
-					// In this case, netNameX will be double-counted.
-	
-	        if(numBus > 1 || isBus)
-	          netName = baseName + "[" + std::to_string(curIdx + offset) + "]";
-	
-	        dbNet net(netID, netName);
-	        dbNetInsts_.push_back(net);
-	
-	        strToNetID_[netName] = netID;
-	
-	        numNet_++;
-	
-	        if(numNet_ % 200000 == 0)
-	        {
-	          using namespace std;
-	          cout << "  Read ";
-	          cout << setw(7) << right << numNet_ << " Nets..." << endl;
-	        }
-	      }
-			}
+          if( strToNetID_.find(netName) != strToNetID_.end() )
+            continue;
+          // If a netName exists already, then do not make new net instance.
+          // This is because of the weird syntax of verilog netlist.
+          // Sometimes there are cases that there is already "input netNameX;",
+          // but netNameX is redefiend again like "wire netNameX;"
+          // In this case, netNameX will be double-counted.
+  
+          if(numBus > 1 || isBus)
+            netName = baseName + "[" + std::to_string(curIdx + offset) + "]";
+  
+          dbNet net(netID, netName);
+          dbNetInsts_.push_back(net);
+  
+          strToNetID_[netName] = netID;
+  
+          numNet_++;
+  
+          if(numNet_ % 200000 == 0)
+          {
+            using namespace std;
+            cout << "  Read ";
+            cout << setw(7) << right << numNet_ << " Nets..." << endl;
+          }
+        }
+      }
     }
     else 
     {
@@ -970,8 +970,8 @@ LefDefParser::readVerilog(const std::filesystem::path& path)
   
         std::string cellName = std::move(*(itr));
 
-				if(cellName[0] == '\\')
-					cellName = cellName.substr(1, cellName.size() - 1 );
+        if(cellName[0] == '\\')
+          cellName = cellName.substr(1, cellName.size() - 1 );
   
         dbCell cell(cellID, cellName, lefMacro);
   
@@ -999,48 +999,48 @@ LefDefParser::readVerilog(const std::filesystem::path& path)
             else if(str == "{")
             {
               int numBus = 0;
-							std::vector<strIter> strItrVec;
+              std::vector<strIter> strItrVec;
 
-							iter++;
-								
-							while( *(iter + 1) != "}" )
-							{
-								strItrVec.push_back( ++iter );
-								numBus++;
-							}
+              iter++;
+                
+              while( *(iter + 1) != "}" )
+              {
+                strItrVec.push_back( ++iter );
+                numBus++;
+              }
 
-							// At this moment, *(iter + 1) == "}"
-							// to skip this bracket,
-							// we have to do iter++ one more time
-							iter++;
+              // At this moment, *(iter + 1) == "}"
+              // to skip this bracket,
+              // we have to do iter++ one more time
+              iter++;
 
-							int curID = numBus - 1;
-							for(auto& sIter : strItrVec)
-							{
-								int netID;
-								std::string portNameWithID = portName + "[" + std::to_string(curID) + "]";
-								netName = std::move(*sIter);
+              int curID = numBus - 1;
+              for(auto& sIter : strItrVec)
+              {
+                int netID;
+                std::string portNameWithID = portName + "[" + std::to_string(curID) + "]";
+                netName = std::move(*sIter);
 
-								// TODO
-								// how to handle 1'b0?
-								if(netName == "1'b0" || netName == "1'b1")
-									continue;
+                // TODO
+                // how to handle 1'b0?
+                if(netName == "1'b0" || netName == "1'b1")
+                  continue;
 
-		 				    checkIfKeyExist(netName, strToNetID_, netID, "Net");
+                 checkIfKeyExist(netName, strToNetID_, netID, "Net");
   
-	              int pinID = numPin_;
+                int pinID = numPin_;
 
-								std::string pinName = portNameWithID + ":" + cellName;
+                std::string pinName = portNameWithID + ":" + cellName;
 
-								dbPin pin(pinID, cellID, netID, pinName, lefMacro->getPin(portNameWithID));
+                dbPin pin(pinID, cellID, netID, pinName, lefMacro->getPin(portNameWithID));
 
-								dbPinInsts_.push_back(pin);
+                dbPinInsts_.push_back(pin);
   
-								strToPinID_[pinName] = pinID;
+                strToPinID_[pinName] = pinID;
 
-								numPin_++;
-								curID--;
-							}
+                numPin_++;
+                curID--;
+              }
             }
             else
             {  
@@ -1166,9 +1166,9 @@ LefDefParser::readDefRow(strIter& itr, const strIter& end)
 
   rowOrient = std::move( *(++itr) );
 
-	// These stupid assert functions are
-	// just for temporary implementations...
-	// they will be replaced soon...
+  // These stupid assert functions are
+  // just for temporary implementations...
+  // they will be replaced soon...
   assert( *(++itr) == "DO" );
 
   numSiteX = std::stoi( *(++itr) );
@@ -1183,7 +1183,7 @@ LefDefParser::readDefRow(strIter& itr, const strIter& end)
 
   stepY = std::stoi( *(++itr) );
 
-	assert( *(++itr) == ";" );
+  assert( *(++itr) == ";" );
 
   LefSite* lefSite;
 
@@ -1194,7 +1194,7 @@ LefDefParser::readDefRow(strIter& itr, const strIter& end)
     std::cout << "[WARNING] Row Orient " << rowOrient;
     std::cout << " is not supported yet." << std::endl;
     std::cout << "[WARNING] Row Orient will be regarded as N." << std::endl;
-		rowOrient = Orient::N;
+    rowOrient = Orient::N;
   }
 
   dbRow row(rowName, lefSite, dbUnit_,
@@ -1231,7 +1231,7 @@ LefDefParser::readDefDie(strIter& itr, const strIter& end)
     }
   }
 
-	assert( *(++itr) == ";" );
+  assert( *(++itr) == ";" );
 
   if(itr == end)
   {
@@ -1253,56 +1253,56 @@ LefDefParser::readDefOneComponent(strIter& itr, const strIter& end)
   int lx = 0;
   int ly = 0;
 
-	int haloL = 0; // Halo Left 
-	int haloB = 0; // Halo Bottom
-	int haloR = 0; // Halo Right
-	int haloT = 0; // Halo Top
+  int haloL = 0; // Halo Left 
+  int haloB = 0; // Halo Bottom
+  int haloR = 0; // Halo Right
+  int haloT = 0; // Halo Top
 
   std::string cellOrient;
 
   instName  = std::move( *(++itr) );
   macroName = std::move( *(++itr) );
 
-	// Innovus saveNetlist -flat inserts '\'...
-	// this makes bug when parsing the def 
-	// that is written for the original netlist
-	instName.erase(std::remove(instName.begin(), instName.end(), '\\'), instName.end() );
+  // Innovus saveNetlist -flat inserts '\'...
+  // this makes bug when parsing the def 
+  // that is written for the original netlist
+  instName.erase(std::remove(instName.begin(), instName.end(), '\\'), instName.end() );
 
-	while( *(++itr) != ";" && itr != end)
-	{
-		if( *(itr) == "+" )
-		{
-			itr++;
-			if( *itr == "PLACED" || *itr == "FIXED")
-			{
-				cellStatus = std::move( *itr );
+  while( *(++itr) != ";" && itr != end)
+  {
+    if( *(itr) == "+" )
+    {
+      itr++;
+      if( *itr == "PLACED" || *itr == "FIXED")
+      {
+        cellStatus = std::move( *itr );
 
-				assert( *(++itr) == "(" );
-				lx = std::stoi( std::move( *(++itr) ) );
-				ly = std::stoi( std::move( *(++itr) ) );
-				assert( *(++itr) == ")" );
+        assert( *(++itr) == "(" );
+        lx = std::stoi( std::move( *(++itr) ) );
+        ly = std::stoi( std::move( *(++itr) ) );
+        assert( *(++itr) == ")" );
 
-				cellOrient = std::move( *(++itr) );
-			}
-			else if( *itr == "UNPLACED" )
-			{
-				// Do Nothing...
-			}
-			else if( *itr == "HALO" )
-			{
-				haloL = std::stoi( std::move( *(++itr) ) );
-				haloB = std::stoi( std::move( *(++itr) ) );
-				haloR = std::stoi( std::move( *(++itr) ) );
-				haloT = std::stoi( std::move( *(++itr) ) );
-			}
-			else if( *itr == "SOURCE" )
-			{
-				// Do Nothing...
-				// Maybe one of NETLIST / DIST / USER / TIMING
-				itr++; 
-			}
-		}
-	}
+        cellOrient = std::move( *(++itr) );
+      }
+      else if( *itr == "UNPLACED" )
+      {
+        // Do Nothing...
+      }
+      else if( *itr == "HALO" )
+      {
+        haloL = std::stoi( std::move( *(++itr) ) );
+        haloB = std::stoi( std::move( *(++itr) ) );
+        haloR = std::stoi( std::move( *(++itr) ) );
+        haloT = std::stoi( std::move( *(++itr) ) );
+      }
+      else if( *itr == "SOURCE" )
+      {
+        // Do Nothing...
+        // Maybe one of NETLIST / DIST / USER / TIMING
+        itr++; 
+      }
+    }
+  }
 
   bool isFixed = (cellStatus == "FIXED") ? true : false;
 
@@ -1343,28 +1343,28 @@ LefDefParser::readDefOneComponent(strIter& itr, const strIter& end)
     cell   = dbCellPtrs_[cellID];
   }
 
-	if(cellStatus != "UNPLACED")
-	{
-		Orient orient;
-		auto orientCheck = strToOrient_.find(cellOrient);
+  if(cellStatus != "UNPLACED")
+  {
+    Orient orient;
+    auto orientCheck = strToOrient_.find(cellOrient);
 
-		if(orientCheck == strToOrient_.end())
-		{
-	    std::cout << "Error - COMPONENT ORIENT " << cellOrient;
-	    std::cout << " is not supported yet." << std::endl;
-	    exit(0);
-	  }
-	  else
-	    orient = orientCheck->second;
+    if(orientCheck == strToOrient_.end())
+    {
+      std::cout << "Error - COMPONENT ORIENT " << cellOrient;
+      std::cout << " is not supported yet." << std::endl;
+      exit(0);
+    }
+    else
+      orient = orientCheck->second;
 
-	  cell->setOrient(orient);
+    cell->setOrient(orient);
 
-	  cell->setLx(lx);
-	  cell->setLy(ly);
+    cell->setLx(lx);
+    cell->setLy(ly);
 
-	  cell->setDx( static_cast<int>( lefMacro->sizeX() * static_cast<float>(dbUnit_) ) );
-	  cell->setDy( static_cast<int>( lefMacro->sizeY() * static_cast<float>(dbUnit_) ) );
-	}
+    cell->setDx( static_cast<int>( lefMacro->sizeX() * static_cast<float>(dbUnit_) ) );
+    cell->setDy( static_cast<int>( lefMacro->sizeY() * static_cast<float>(dbUnit_) ) );
+  }
 
   numDefComps_++;
 
@@ -1380,7 +1380,7 @@ LefDefParser::readDefComponents(strIter& itr, const strIter& end)
 {
   int defComponents = std::stoi( std::move( *(++itr) ) );
 
-	assert( *(++itr) == ";" );
+  assert( *(++itr) == ";" );
 
   while(++itr != end)
   {
@@ -1390,7 +1390,7 @@ LefDefParser::readDefComponents(strIter& itr, const strIter& end)
       break;
     else
     {
-			std::cout << *itr << std::endl;
+      std::cout << *itr << std::endl;
       std::cout << "Syntax Error while Reading DEF COMPONENTS" << std::endl;
       exit(0);
     }
@@ -1481,49 +1481,49 @@ LefDefParser::readDefOnePin(strIter& itr, const strIter& end)
     std::cout << "[WARNING] Pin Orient " << pinOrient;
     std::cout << " is not supported yet." << std::endl;
     std::cout << "[WARNING] Pin Orient will be regarded as N." << std::endl;
-		orient = Orient::N;
+    orient = Orient::N;
   }
 
-	int lx = 0;
-	int ly = 0;
-	int dx = 0;
-	int dy = 0;
+  int lx = 0;
+  int ly = 0;
+  int dx = 0;
+  int dy = 0;
 
-	// origin is always the center of the lowest side
-	// -----
-	// |   |
-	// |   |
-	// -----
-	//   O
+  // origin is always the center of the lowest side
+  // -----
+  // |   |
+  // |   |
+  // -----
+  //   O
 
-	//        O:  Orient 
-	// E
-	//   -------
-	// O |     |
-	//   -------
-	
-	// -----
-	// |   |
-	// |   |
-	// -----
-	// N O
+  //        O:  Orient 
+  // E
+  //   -------
+  // O |     |
+  //   -------
+  
+  // -----
+  // |   |
+  // |   |
+  // -----
+  // N O
 
-	if(orient == Orient::N)
-	{
-		dx = offsetX2 - offsetX1;
-		dy = offsetY2 - offsetY1;
+  if(orient == Orient::N)
+  {
+    dx = offsetX2 - offsetX1;
+    dy = offsetY2 - offsetY1;
 
-		lx = originX - dx / 2;
-		ly = originY;
-	}
-	else if(orient == Orient::E)
-	{
-		dx = offsetY2 - offsetY1;
-		dy = offsetX2 - offsetY2;
+    lx = originX - dx / 2;
+    ly = originY;
+  }
+  else if(orient == Orient::E)
+  {
+    dx = offsetY2 - offsetY1;
+    dy = offsetX2 - offsetY2;
 
-		lx = originX;
-		ly = originY - dy / 2;
-	}
+    lx = originX;
+    ly = originY - dy / 2;
+  }
 
   bool ifKeyExist;
   checkIfKeyExist(pinName, strToIOID_, ioID, "PIN", ifKeyExist);
@@ -1554,7 +1554,7 @@ LefDefParser::readDefPins(strIter& itr, const strIter& end)
 {
   int numDefPins = std::stoi( *(++itr) );
 
-	assert( *(++itr) == ";" );
+  assert( *(++itr) == ";" );
 
   while(++itr != end)
   {
@@ -1625,23 +1625,23 @@ LefDefParser::readDef(const std::filesystem::path& fileName)
   int coreUx = INT_MIN;
   int coreUy = INT_MIN;
 
-	int lx, ly, ux, uy = 0;
+  int lx, ly, ux, uy = 0;
 
   for(auto& r : dbRowInsts_)
   {
     lx = r.origX();
     ux = lx + r.sizeX();
 
-		if(r.orient() == Orient::N)
-		{
-			ly = r.origY();
-			uy = ly + r.sizeY();
-		}
-		else if(r.orient() == Orient::FS)
-		{
-			uy = r.origY();
-			ly = ly + r.sizeY();
-		}
+    if(r.orient() == Orient::N)
+    {
+      ly = r.origY();
+      uy = ly + r.sizeY();
+    }
+    else if(r.orient() == Orient::FS)
+    {
+      uy = r.origY();
+      ly = ly + r.sizeY();
+    }
 
     if(lx < coreLx)
       coreLx = lx;
@@ -1670,14 +1670,14 @@ LefDefParser::readDef(const std::filesystem::path& fileName)
       sumStdCellArea_ += area;
   }
 
-	// ioArea will be counted for FixedArea
-	int64_t ioArea = 0;
+  // ioArea will be counted for FixedArea
+  int64_t ioArea = 0;
 
-	for(auto & io : dbIOPtrs_)
-	{
-		int64_t area = io->area();
-		ioArea += area;
-	}
+  for(auto & io : dbIOPtrs_)
+  {
+    int64_t area = io->area();
+    ioArea += area;
+  }
 
   int64_t coreArea = die_.coreArea();
 

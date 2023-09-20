@@ -320,10 +320,10 @@ class dbIO
     // If DEF is read first (before reading .v)
     // Use this constructor
     dbIO(int ioID, 
-				 int   lx,
-				 int   ly,
-				 int   dx,
-				 int   dy,
+         int   lx,
+         int   ly,
+         int   dx,
+         int   dy,
          bool  isFixed,
          Orient orient,
          PinDirection direction,
@@ -347,17 +347,17 @@ class dbIO
     int           cx() const { return lx_ + dx_ / 2;  }
     int           cy() const { return ly_ + dy_ / 2;  }
 
-		int64_t     area() const { return static_cast<int64_t>(dx_) 
-			                              * static_cast<int64_t>(dy_); }
+    int64_t     area() const { return static_cast<int64_t>(dx_) 
+                                    * static_cast<int64_t>(dy_); }
 
-		int        origX() const { return origX_;         }
-		int        origY() const { return origY_;         }
+    int        origX() const { return origX_;         }
+    int        origY() const { return origY_;         }
 
-		int     offsetX1() const { return offsetX1_;      }
-		int     offsetY1() const { return offsetY1_;      }
+    int     offsetX1() const { return offsetX1_;      }
+    int     offsetY1() const { return offsetY1_;      }
 
-		int     offsetX2() const { return offsetX2_;      }
-		int     offsetY2() const { return offsetY2_;      }
+    int     offsetX2() const { return offsetX2_;      }
+    int     offsetY2() const { return offsetY2_;      }
 
     bool     isFixed() const { return isFixed_;       }
 
@@ -368,35 +368,35 @@ class dbIO
     PinDirection direction() const { return direction_; }
 
     // Setters
-		void setDefInfo(int originX,  int originY, 
-				            int offsetX1, int offsetY1, 
-				            int offsetX2, int offsetY2) 
+    void setDefInfo(int originX,  int originY, 
+                    int offsetX1, int offsetY1, 
+                    int offsetX2, int offsetY2) 
     {
-			origX_    = originX;
-			origX_    = originX;
+      origX_    = originX;
+      origX_    = originX;
 
-			offsetX1_ = offsetX1;
-			offsetY1_ = offsetY1;
+      offsetX1_ = offsetX1;
+      offsetY1_ = offsetY1;
 
-			offsetX2_ = offsetX2;
-			offsetY2_ = offsetY2;
+      offsetX2_ = offsetX2;
+      offsetY2_ = offsetY2;
     }
 
     void setLocation(int lx, int ly, int dx, int dy)
     {
-			lx_ = lx;
-			ly_ = ly;
+      lx_ = lx;
+      ly_ = ly;
 
-			dx_ = dx;
-		  dy_ = dy;
+      dx_ = dx;
+      dy_ = dy;
 
       pin_->setCx(lx + dx / 2);
       pin_->setCy(ly + dy / 2);
 
       pin_->setOffsetX(0);
       pin_->setOffsetY(0);
-			// the location of dbPin of dbIO is just same as the center of dbIO
-			// (no specific reason...)
+      // the location of dbPin of dbIO is just same as the center of dbIO
+      // (no specific reason...)
     }
 
     void setPin       (dbPin* pin   ) { pin_      = pin;      }
@@ -406,12 +406,12 @@ class dbIO
   private:
 
     int id_;
-	
-		int lx_;
-		int ly_;
+  
+    int lx_;
+    int ly_;
 
-		int dx_;
-		int dy_;
+    int dx_;
+    int dy_;
 
     int origX_;
     int origY_;
@@ -487,15 +487,15 @@ class dbCell
 
     const std::vector<dbPin*>& pins() const { return pins_; }
 
-		// For Debugging
-		void printLoc() const
-		{
-			std::cout << name() << std::endl;
-			std::cout << "Lx: " << lx_  << std::endl;
-			std::cout << "Ly: " << ly_  << std::endl;
-			std::cout << "Ux: " << ux() << std::endl;
-			std::cout << "Uy: " << uy() << std::endl;
-		}
+    // For Debugging
+    void printLoc() const
+    {
+      std::cout << name() << std::endl;
+      std::cout << "Lx: " << lx_  << std::endl;
+      std::cout << "Ly: " << ly_  << std::endl;
+      std::cout << "Ux: " << ux() << std::endl;
+      std::cout << "Uy: " << uy() << std::endl;
+    }
 
   private:
 
@@ -536,14 +536,14 @@ class dbRow
           int numSiteY,
           int stepX,
           int stepY,
-					Orient orient) 
+          Orient orient) 
       : origX_    ( origX    ),
         origY_    ( origY    ),
         numSiteX_ ( numSiteX ),
         numSiteY_ ( numSiteY ),
         stepX_    ( stepX    ),
         stepY_    ( stepY    ),
-				orient_   ( orient   )
+        orient_   ( orient   )
     {
       sizeX_ =
         static_cast<int>( lefSite->sizeX() * numSiteX * dbUnit );
@@ -568,7 +568,7 @@ class dbRow
     int     sizeX() const { return sizeX_;    }
     int     sizeY() const { return sizeY_;    }
 
-		Orient orient() const { return orient_;   }
+    Orient orient() const { return orient_;   }
 
   private:
 
@@ -587,7 +587,7 @@ class dbRow
     int sizeX_;
     int sizeY_;
 
-		Orient orient_;
+    Orient orient_;
 };
 
 class dbDie
@@ -662,7 +662,7 @@ class LefDefParser
     std::vector<dbNet*>   nets() const { return dbNetPtrs_;  }                 // List of Nets
     std::vector<dbRow*>   rows() const { return dbRowPtrs_;  }                 // List of DEF ROWS
     const dbDie*           die() const { return &die_;       }                 // Ptr of dbDie
-		int                 dbUnit() const { return dbUnit_;     }                 // Get DB Unit (normally 1000 or 2000)
+    int                 dbUnit() const { return dbUnit_;     }                 // Get DB Unit (normally 1000 or 2000)
 
     std::string     designName() const { return designName_; }                 // Returns the top module name (from .v)
 
@@ -677,7 +677,7 @@ class LefDefParser
     bool ifReadVerilog_;                                                       // Verilog Flag
     bool ifReadDef_;                                                           // DEF     Flag
 
-		void reset();                                                              // Reset Function (clear or initialize all db)
+    void reset();                                                              // Reset Function (clear or initialize all db)
 
     // LEF-related
     int dbUnit_;                                                               // LEF DATABASE MICRONS
@@ -703,7 +703,7 @@ class LefDefParser
     std::unordered_map<std::string, PinUsage>     strToPinUsage_;              // String - enum PIN_USAGE     Table
     std::unordered_map<std::string, Orient>       strToOrient_;                // String - enum ORIENT        Table
 
-		std::set<std::string>                         lefList_;                    // Set of LEF File name that already read
+    std::set<std::string>                         lefList_;                    // Set of LEF File name that already read
 
     // Verilog-related
     std::string designName_;                                                   // Top Module name
@@ -749,8 +749,8 @@ class LefDefParser
 
     float density_;                                                            // TotalInstArea / DieArea
     float util_;                                                               //   MovableArea / (DieArea - FixedArea)
-																																							 // e.g. MovableArea = StdCellArea
-																																							 //      FixedArea   = MacroArea
+                                                                               // e.g. MovableArea = StdCellArea
+                                                                               //      FixedArea   = MacroArea
 
     dbDie die_;                                                                // Instance of dbDie
 

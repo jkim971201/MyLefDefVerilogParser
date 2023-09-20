@@ -14,8 +14,8 @@
 #define MAX_W 6000
 #define MAX_H 6000
 
-#define WINDOW_W 2000
-#define WINDOW_H 2000
+#define WINDOW_W 800
+#define WINDOW_H 800
 
 #define ZOOM_SPEED 300
 #define MOVE_SPEED 300
@@ -226,7 +226,7 @@ Painter::drawCell(CImgObj *img, const dbCell* cell)
                                               MACRO_LINE_THICKNESS, 
                                               MACRO_OPACITY);
 
-		// cell->printLoc();
+    // cell->printLoc();
   }
   else 
   {
@@ -277,16 +277,16 @@ Painter::drawCells(CImgObj *img)
   for(auto &c : db_->cells())
   {
     if( c->isFixed() )
-			drawFixed(img, c);
-		else
-			drawCell(img, c);
+      drawFixed(img, c);
+    else
+      drawCell(img, c);
   }
 }
 
 void
 Painter::drawChip()
 {
-	init();
+  init();
   drawDie(img_);
   drawCells(img_);
   show();

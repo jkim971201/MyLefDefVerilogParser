@@ -30,12 +30,12 @@ int main(int argc, char** argv)
   std::shared_ptr<LefDefParser> parser;
   parser = std::make_shared<LefDefParser>();
 
-	std::shared_ptr<Painter> painter;
-	painter = std::make_shared<Painter>(parser);
+  std::shared_ptr<Painter> painter;
+  painter = std::make_shared<Painter>(parser);
 
   CmdInterpreter cmd;
-	cmd.setParser(parser);
-	cmd.setPainter(painter);
+  cmd.setParser(parser);
+  cmd.setPainter(painter);
 
   cmd.readCmd(cmdfile);
 

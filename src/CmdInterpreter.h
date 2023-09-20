@@ -19,11 +19,11 @@ class CmdInterpreter
     
     CmdInterpreter();                                       // Constructor
 
-		// Setters
-		void setParser   (std::shared_ptr<LefDefParser> parser )  { parser_   = parser;   }
-		void setPainter  (std::shared_ptr<Painter>      painter)  { painter_  = painter;  }
+    // Setters
+    void setParser   (std::shared_ptr<LefDefParser> parser )  { parser_   = parser;   }
+    void setPainter  (std::shared_ptr<Painter>      painter)  { painter_  = painter;  }
 
-		// For main functionality
+    // For main functionality
     void readCmd(const std::filesystem::path& cmdfile);     // Read Command (.cmd) file
 
   private:
@@ -44,7 +44,7 @@ class CmdInterpreter
     void readVerilogCmd      ();                            // Wrapper for read_verilog in LefDefParser
     void printInfoCmd        ();                            // Wrapper for printInfo    in LefDefParser
     
-		void drawChipCmd         ();                            // Wrapper for drawChip     in Painter 
+    void drawChipCmd         ();                            // Wrapper for drawChip     in Painter 
 
     // Table: [CMD String] [Function Pointer]
     // Inspired by OpenTimer...

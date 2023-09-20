@@ -25,34 +25,34 @@ inline void typeError(const std::string& type)
 
 inline bool checkFileType(const std::filesystem::path& path, const std::string& type)
 {
-	std::string filename = std::string(path);
+  std::string filename = std::string(path);
   size_t dot = filename.find_last_of('.');
   std::string filetype = filename.substr(dot + 1);
 
-	if(filetype != type)
-		return false;
-	else
-		return true;
+  if(filetype != type)
+    return false;
+  else
+    return true;
 }
 
 CmdInterpreter::CmdInterpreter()
-	: parser_   (nullptr),
-	  painter_  (nullptr)
+  : parser_   (nullptr),
+    painter_  (nullptr)
 {}
 
 void
 CmdInterpreter::readCmd(const std::filesystem::path& cmdfile)
 {
-	if(parser_ == nullptr || painter_ == nullptr)
-	{
-		std::cout << "Submodule for CmdInterpreter is not set!" << std::endl;
-		exit(0);
-	}
+  if(parser_ == nullptr || painter_ == nullptr)
+  {
+    std::cout << "Submodule for CmdInterpreter is not set!" << std::endl;
+    exit(0);
+  }
 
   std::cout << "Read " << cmdfile << std::endl;
 
-	if( !checkFileType(cmdfile, "cmd") )
-		typeError("cmd");
+  if( !checkFileType(cmdfile, "cmd") )
+    typeError("cmd");
 
   std::string filename = std::string(cmdfile);
  
@@ -99,11 +99,11 @@ CmdInterpreter::readLefCmd()
     ss_ >> arg_;
     
     for(auto& file : dirItr(arg_) )
-		{
-			if( !checkFileType(file.path(), "lef") )
-				continue;
+    {
+      if( !checkFileType(file.path(), "lef") )
+        continue;
       parser_->readLef( file.path() );
-		}
+    }
   }
   else
   {
