@@ -35,9 +35,20 @@ inline bool checkFileType(const std::filesystem::path& path, const std::string& 
 		return true;
 }
 
+CmdInterpreter::CmdInterpreter()
+	: parser_   (nullptr),
+	  painter_  (nullptr)
+{}
+
 void
 CmdInterpreter::readCmd(const std::filesystem::path& cmdfile)
 {
+	if(parser_ == nullptr || painter_ == nullptr)
+	{
+		std::cout << "Submodule for CmdInterpreter is not set!" << std::endl;
+		exit(0);
+	}
+
   std::cout << "Read " << cmdfile << std::endl;
 
 	if( !checkFileType(cmdfile, "cmd") )
@@ -133,4 +144,10 @@ void
 CmdInterpreter::printInfoCmd()
 {
   parser_->printInfo();
+}
+
+void
+CmdInterpreter::drawChipCmd()
+{
+  painter_->drawChip();
 }

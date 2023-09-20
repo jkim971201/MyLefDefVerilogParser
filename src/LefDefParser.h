@@ -486,6 +486,16 @@ class dbCell
 
     const std::vector<dbPin*>& pins() const { return pins_; }
 
+		// For Debugging
+		void printLoc() const
+		{
+			std::cout << name() << std::endl;
+			std::cout << "Lx: " << lx_  << std::endl;
+			std::cout << "Ly: " << ly_  << std::endl;
+			std::cout << "Ux: " << ux() << std::endl;
+			std::cout << "Uy: " << uy() << std::endl;
+		}
+
   private:
 
     int id_;

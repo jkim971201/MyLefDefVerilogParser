@@ -217,14 +217,14 @@ LefDefParser::tokenize(const std::filesystem::path& path,
   buffer[fsize] = 0;
   
   // Mark out the comment
-  for(size_t i=0; i < fsize; ++i) 
+  for(size_t i = 0; i < fsize; ++i) 
   {
     // Block comment
     if(buffer[i] == '/' && buffer[i+1] == '*') 
     {
       buffer[i] = buffer[i+1] = ' ';
 
-      for(i=i+2; i<fsize; buffer[i++]=' ') 
+      for(i = i + 2; i < fsize; buffer[i++]=' ') 
       {
         if(buffer[i] == '*' && buffer[i+1] == '/') 
         {
@@ -961,11 +961,14 @@ LefDefParser::readVerilog(const std::filesystem::path& path)
         int cellID = numInst_;
   
         std::string cellName = std::move(*(itr));
+
+				if(cellName[0] == '\\')
+					cellName = cellName.substr(1, cellName.size() - 1 );
   
         dbCell cell(cellID, cellName, lefMacro);
   
-        cell.setDx( static_cast<int>( lefMacro->sizeX() * dbUnit_ ) );
-        cell.setDy( static_cast<int>( lefMacro->sizeY() * dbUnit_ ) );
+        cell.setDx( static_cast<int>( lefMacro->sizeX() * static_cast<float>(dbUnit_) ) );
+        cell.setDy( static_cast<int>( lefMacro->sizeY() * static_cast<float>(dbUnit_) ) );
   
         strToCellID_[cellName] = cellID;
   
@@ -1252,6 +1255,11 @@ LefDefParser::readDefOneComponent(strIter& itr, const strIter& end)
   instName  = std::move( *(++itr) );
   macroName = std::move( *(++itr) );
 
+	// Innovus saveNetlist -flat inserts '\'...
+	// this makes bug when parsing the def 
+	// that is written for the original netlist
+	instName.erase(std::remove(instName.begin(), instName.end(), '\\'), instName.end() );
+
 	while( *(++itr) != ";" && itr != end)
 	{
 		if( *(itr) == "+" )
@@ -1346,8 +1354,8 @@ LefDefParser::readDefOneComponent(strIter& itr, const strIter& end)
 	  cell->setLx(lx);
 	  cell->setLy(ly);
 
-	  cell->setDx( static_cast<int>( lefMacro->sizeX() * dbUnit_ ) );
-	  cell->setDy( static_cast<int>( lefMacro->sizeY() * dbUnit_ ) );
+	  cell->setDx( static_cast<int>( lefMacro->sizeX() * static_cast<float>(dbUnit_) ) );
+	  cell->setDy( static_cast<int>( lefMacro->sizeY() * static_cast<float>(dbUnit_) ) );
 	}
 
   numDefComps_++;

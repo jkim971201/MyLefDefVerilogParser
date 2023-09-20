@@ -12,8 +12,10 @@
 
 #include "LefDefParser.h"
 #include "CmdInterpreter.h"
+#include "Painter.h"
 
 using namespace LefDefDB;
+using namespace Graphic;
 
 int main(int argc, char** argv)
 {
@@ -23,28 +25,17 @@ int main(int argc, char** argv)
     exit(0);
   }
 
-//  std::filesystem::path fileName  = argv[1];
-//
-//  std::filesystem::path fileName2 = argv[2];
-//
-//  std::filesystem::path fileName3 = argv[3];
-//
-//  LefDefDB::LefDefParser parser;
-//
-//  parser.readLef(fileName);
-//
-//  parser.readVerilog(fileName2);
-//
-//  parser.readDef(fileName3);
-//
-//  parser.printInfo();
-
   std::filesystem::path cmdfile = argv[1];
 
   std::shared_ptr<LefDefParser> parser;
   parser = std::make_shared<LefDefParser>();
 
-  CmdInterpreter cmd(parser);
+	std::shared_ptr<Painter> painter;
+	painter = std::make_shared<Painter>(parser);
+
+  CmdInterpreter cmd;
+	cmd.setParser(parser);
+	cmd.setPainter(painter);
 
   cmd.readCmd(cmdfile);
 
