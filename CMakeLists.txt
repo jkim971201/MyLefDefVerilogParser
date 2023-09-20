@@ -20,39 +20,18 @@ set(THREADS_PREFER_PTHREAD_FLAG ON) # For CImg
 # Home Directory
 set(Parser_HOME ${PROJECT_SOURCE_DIR})
 set(CIMG_HOME ${PROJECT_SOURCE_DIR}/extern/CImg)
-set(CXXOPTS_HOME ${PROJECT_SOURCE_DIR}/extern/cxxopts)
 
-set(LEFLIB_HOME ${PROJECT_SOURCE_DIR}/extern/lef)
-set(DEFLIB_HOME ${PROJECT_SOURCE_DIR}/extern/def)
-set(FFTLIB_HOME ${PROJECT_SOURCE_DIR}/extern/fft)
-
-set(EIGEN_HOME ${PROJECT_SOURCE_DIR}/extern/eigen-git-mirror)
-
-set(GOOGLEHASH_HOME "/usr/local/include/sprasehash")
-
-# Package Settings
-# 1. For Boost and Google Hash Map
-find_package(Boost REQUIRED)
-
-# 2. For CImg
+# For CImg
 find_package(X11 REQUIRED)
 find_package(JPEG REQUIRED)
 find_package(Threads REQUIRED)
-
-## 3. For Eigen
-#find_package(Eigen3 REQUIRED)
-#if(Eigen3_FOUND)
-#	message(STATUS "Eigen3 Found")
-#	message(STATUS "${Eigen3_DIR}")
-#	message(STATUS "${Eigen3_INCLUDE_DIR}")
-#else()
-#	message(STATUS "Eigen3 Not Found")
-#endif()
 
 # Source Code
 set(Parser_SRC
 	src/main.cpp
 	src/LefDefParser.cpp
+	src/CmdInterpreter.cpp
+	src/Painter.cpp
 )
 
 # Include Directory
@@ -71,37 +50,3 @@ target_link_libraries(${PROJECT_NAME}
  	${X11_LIBRARIES}
 	Threads::Threads
 )
-
-# Enable CUDA
-option(GPU "Enable GPU" ON)
-if (GPU)
-	message(STATUS "GPU Mode ON")
-	find_package(CUDAToolkit)
-	if (CUDAToolkit_FOUND)
-		message(STATUS "CUDA Found")
-		enable_language(CUDA)
-
-		find_package(Thrust)
-
-		set_target_properties(${PROJECT_NAME} 
-				                  PROPERTIES CUDA_ARCHITECTURES "75")
-
-		target_sources(${PROJECT_NAME} 
-				           PRIVATE
-									 )
-
-		target_link_libraries(${PROJECT_NAME} 
-				                  PRIVATE
-													CUDA::cudart
-													CUDA::cublas
-													CUDA::cusparse
-													CUDA::cufft)
-
-		target_compile_definitions(${PROJECT_NAME} PRIVATE ENABLE_GPU)
-
-	else()
-		message(STATUS "CUDA Not Found")
-	endif()
-else()
-	message(STATUS "GPU Mode Off")
-endif()
