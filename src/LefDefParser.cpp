@@ -24,26 +24,30 @@ inline bool isSqrBracket(const std::string& str)
   return (str[0] == '[' && str.back() == ']');
 }
 
-inline int getBusNumber(const std::string& str)
+inline void getBusNumber(const std::string& str, int& numBus, int& offset)
 {
-  // RegExp-> xx:0
-  // {1} means there has to be only one zero
-  std::regex re("([0-9]+):[0]{1}");
+  // RegExp-> xx:yy
+  std::regex re("([0-9]+):[0-9]+");
   std::regex nu("([0-9]+)");
 
-  // str => [xx:0]
+  // str => [xx:yy]
   auto begin = std::sregex_iterator( str.begin() + 1, str.end() - 1, re);
   auto end   = std::sregex_iterator();
 
   if(begin == end)
   {
     std::cout << "Bus syntax error..." << std::endl;
+		std::cout << str << std::endl;
     exit(0);
   }
 
   auto nuRegItr = std::sregex_iterator( str.begin() + 1, str.end() - 1, nu);
+	
+	int bit1 = std::stoi( nuRegItr->str() );
+	int bit2 = std::stoi( (++nuRegItr)->str() );
 
-  return std::stoi( nuRegItr->str() );
+	numBus = bit1 - bit2 + 1;
+	offset = bit2;
 }
 
 // Iteratively apply closure c on each token inside the parentheses pair
@@ -817,11 +821,12 @@ LefDefParser::readVerilog(const std::filesystem::path& path)
 			// To handle [0:0] case...
       bool isBus = false;
       int numBus = 1;
+			int offset = 0;
 
       if( isSqrBracket( *(itr + 1) ) )
       {
         isBus  = true;
-        numBus = getBusNumber( *(++itr) ) + 1;
+        getBusNumber( *(++itr), numBus, offset);
       }
 
       while(++itr != end && *itr != ";") 
@@ -832,14 +837,15 @@ LefDefParser::readVerilog(const std::filesystem::path& path)
         //std::cout << baseName << std::endl;
         //std::cout << numBus << std::endl;
 
-        // input xx[31:0];
-        // numBus   = 32
+        // input xx[31:16];
+        // numBus   = 16
+				// offset   = 16
         // baseName = xx
-        // pinName  = baseName + i (i -> 0 ~ 31)
+        // pinName  = baseName + i (i -> 16 ~ 31)
         for(int curIdx = 0; curIdx < numBus; curIdx++)
         {
           if(numBus > 1)
-            pinName = baseName + "[" + std::to_string(curIdx) + "]";
+            pinName = baseName + "[" + std::to_string(curIdx + offset) + "]";
 
           std::string netName = pinName;
           std::string ioName  = pinName;
@@ -881,21 +887,23 @@ LefDefParser::readVerilog(const std::filesystem::path& path)
 			// To handle [0:0] case...
       bool isBus = false;
       int numBus = 1;
+			int offset = 0;
 
       if( isSqrBracket( *(itr + 1) ) )
       {
         isBus  = true;
-        numBus = getBusNumber( *(++itr) ) + 1;
+        getBusNumber( *(++itr), numBus, offset);
       }
 
       while( ++itr != end && *itr != ";")
 			{
 	      std::string baseName = std::move( *(itr) );
 	        
-	      // wire xx[31:0];
-	      // numBus   = 32
-	      // baseName = xx
-	      // netName  = baseName + i (i -> 0 ~ 31)
+	      // wire xx[31:16];
+        // numBus   = 16
+				// offset   = 16
+        // baseName = xx
+        // pinName  = baseName + i (i -> 16 ~ 31)
 	      for(int curIdx = 0; curIdx < numBus; curIdx++)
 	      {
 	        int netID = numNet_;
@@ -910,7 +918,7 @@ LefDefParser::readVerilog(const std::filesystem::path& path)
 					// In this case, netNameX will be double-counted.
 	
 	        if(numBus > 1 || isBus)
-	          netName = baseName + "[" + std::to_string(curIdx) + "]";
+	          netName = baseName + "[" + std::to_string(curIdx + offset) + "]";
 	
 	        dbNet net(netID, netName);
 	        dbNetInsts_.push_back(net);

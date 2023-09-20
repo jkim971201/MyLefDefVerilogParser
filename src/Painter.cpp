@@ -274,8 +274,6 @@ Painter::drawMovable(CImgObj *img, const dbCell* cell)
 void
 Painter::drawCells(CImgObj *img)
 {
-	std::cout << "numCells: " << db_->cells().size() << std::endl;
-
   for(auto &c : db_->cells())
   {
     if( c->isFixed() )

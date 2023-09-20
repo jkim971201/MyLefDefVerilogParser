@@ -21,6 +21,7 @@ enum PinDirection {INPUT, OUTPUT, INOUT};
 enum PinUsage     {SIGNAL, POWER, GROUND, CLOCK};
 enum Orient       {N, S, E, FN, FS};  // W E FW FE is not supported
 
+// This class is for describing the pin shape of LefPin
 struct LefRect
 {
   float lx;
@@ -596,7 +597,7 @@ class dbDie
     dbDie() {}
 
     // Setters
-    void setCoordi(int lx, int ly, int ux, int uy)
+    void setCoordi(int lx, int ly, int ux, int uy)        // Set Coordinates of Die
     {
       lx_ = lx;
       ly_ = ly;
@@ -604,14 +605,14 @@ class dbDie
       uy_ = uy;
     }
 
-    void setCoreCoordi(int lx, int ly, int ux, int uy)
+    void setCoreCoordi(int lx, int ly, int ux, int uy)    // Set Coordinates of Core
     {
-      coreLx_ = lx;
-      coreLy_ = ly;
-      coreUx_ = ux;
-      coreUy_ = uy;
-    }
-
+      coreLx_ = lx;                                       //  -------------------
+      coreLy_ = ly;                                       //  |   ----------    |
+      coreUx_ = ux;                                       //  |   |        |    |
+      coreUy_ = uy;                                       //  |   | Core   |    | 
+    }                                                     //  |   ----------    |
+                                                          //  -------------------  Die
     // Getters
     int lx()     const { return lx_;     }
     int ly()     const { return ly_;     }
@@ -656,12 +657,12 @@ class LefDefParser
 
     // Getters
     std::vector<dbCell*> cells() const { return dbCellPtrs_; }                 // List of DEF COMPONENTS
-    std::vector<dbIO*>     ios() const { return dbIOPtrs_;   }                 // List of DEF PINS 
+    std::vector<dbIO*>     ios() const { return dbIOPtrs_;   }                 // List of DEF PINS (IO PAD)
     std::vector<dbPin*>   pins() const { return dbPinPtrs_;  }                 // List of Internal + External Pins
     std::vector<dbNet*>   nets() const { return dbNetPtrs_;  }                 // List of Nets
     std::vector<dbRow*>   rows() const { return dbRowPtrs_;  }                 // List of DEF ROWS
     const dbDie*           die() const { return &die_;       }                 // Ptr of dbDie
-		int                 dbUnit() const { return dbUnit_;     }                 // Get DB Unit (normally 1000 / 2000)
+		int                 dbUnit() const { return dbUnit_;     }                 // Get DB Unit (normally 1000 or 2000)
 
     std::string     designName() const { return designName_; }                 // Returns the top module name (from .v)
 
