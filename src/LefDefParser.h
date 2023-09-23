@@ -656,13 +656,13 @@ class LefDefParser
     void printInfo   ();                                                       // Print Technology & Design Information
 
     // Getters
-    std::vector<dbCell*> cells() const { return dbCellPtrs_; }                 // List of DEF COMPONENTS
-    std::vector<dbIO*>     ios() const { return dbIOPtrs_;   }                 // List of DEF PINS (IO PAD)
-    std::vector<dbPin*>   pins() const { return dbPinPtrs_;  }                 // List of Internal + External Pins
-    std::vector<dbNet*>   nets() const { return dbNetPtrs_;  }                 // List of Nets
-    std::vector<dbRow*>   rows() const { return dbRowPtrs_;  }                 // List of DEF ROWS
-    const dbDie*           die() const { return &die_;       }                 // Ptr of dbDie
-    int                 dbUnit() const { return dbUnit_;     }                 // Get DB Unit (normally 1000 or 2000)
+    const std::vector<dbCell*>& cells() const { return dbCellPtrs_; }          // List of DEF COMPONENTS
+    const std::vector<dbIO*>&     ios() const { return dbIOPtrs_;   }          // List of DEF PINS (IO PAD)
+    const std::vector<dbPin*>&   pins() const { return dbPinPtrs_;  }          // List of Internal + External Pins
+    const std::vector<dbNet*>&   nets() const { return dbNetPtrs_;  }          // List of Nets
+    const std::vector<dbRow*>&   rows() const { return dbRowPtrs_;  }          // List of DEF ROWS
+    const dbDie*                  die() const { return &die_;       }          // Ptr of dbDie
+    int                        dbUnit() const { return dbUnit_;     }          // Get DB Unit (normally 1000 or 2000)
 
     std::string     designName() const { return designName_; }                 // Returns the top module name (from .v)
 
